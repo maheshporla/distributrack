@@ -1,12 +1,11 @@
 package com.distributrack.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import org.springframework.beans.factory.annotation.Value;
 
 import java.util.Arrays;
 import java.util.List;
@@ -15,11 +14,15 @@ import java.util.List;
 public class CorsConfig {
 
     /**
-     * Comma-separated allowed origins. Override via the
-     * CORS_ALLOWED_ORIGINS environment variable in production; the
-     * defaults cover local Vite dev servers.
+     * Comma-separated allowed origins.
+     *
+     * Production:
+     * Set CORS_ALLOWED_ORIGINS in Railway variables.
+     *
+     * Local development:
+     * localhost Vite ports are included as defaults.
      */
-    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:5174,http://localhost:5177}")
+    @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:5174,http://localhost:5177,https://distributrack.vercel.app}")
     private String allowedOrigins;
 
     @Bean
@@ -32,7 +35,6 @@ public class CorsConfig {
                         .map(String::trim)
                         .filter(origin -> !origin.isEmpty())
                         .toList()
-
         );
 
         configuration.setAllowedMethods(
