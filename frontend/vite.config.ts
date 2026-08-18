@@ -5,15 +5,19 @@ import tailwindcss from "@tailwindcss/vite";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+
   resolve: {
     alias: {
       "@": new URL("./src", import.meta.url).pathname,
     },
   },
+
   server: {
     port: 5173,
+    strictPort: true,
     open: false,
   },
+
   build: {
     outDir: "dist",
     sourcemap: true,

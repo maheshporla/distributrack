@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
-import { ROUTES } from "@/constants/routes.constants";
+import { defaultRouteForRole } from "@/lib/roleRoutes";
 
 /**
  * Guards routes meant only for signed-out users (Login, Register).
@@ -13,9 +13,11 @@ import { ROUTES } from "@/constants/routes.constants";
  */
 export function GuestRoute() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const role = useAuthStore((state) => state.user?.role);
 
   if (isAuthenticated) {
-    return <Navigate to={ROUTES.DASHBOARD} replace />;
+    // Role-aware landing — the dashboard is business-role only.
+    return <Navigate to={defaultRouteForRole(role)} replace />;
   }
 
   return <Outlet />;

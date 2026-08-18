@@ -3,6 +3,7 @@ package com.distributrack.service;
 import com.distributrack.dto.request.*;
 import com.distributrack.dto.response.AuthResponse;
 import com.distributrack.dto.response.RefreshTokenResponse;
+import com.distributrack.dto.response.UserResponse;
 
 public interface AuthService {
 
@@ -20,4 +21,12 @@ public interface AuthService {
     String forgotPassword(ForgotPasswordRequest request);
 
     void resetPassword(ResetPasswordRequest request);
+
+    /**
+     * Returns the currently authenticated user, resolved from the
+     * security context (never from a request parameter).
+     */
+    UserResponse getCurrentUser();
+
+    UserResponse updateProfile(String email, UpdateProfileRequest request);
 }

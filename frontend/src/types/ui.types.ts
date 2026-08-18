@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { RoleName } from "@/types/auth.types";
 
 /**
  * Column definition consumed by <DataTable />.
@@ -20,6 +21,11 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number | string;
   children?: NavItem[];
+  /**
+   * Roles allowed to see this nav item. Omit for items visible to every
+   * authenticated user. SidebarNav filters on the JWT role claim.
+   */
+  roles?: RoleName[];
 }
 
 export type StatTrend = "up" | "down" | "neutral";

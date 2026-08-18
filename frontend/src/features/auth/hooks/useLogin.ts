@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { authService } from "@/services/api/authService";
 import { useAuthStore } from "@/store/authStore";
 import { loginSchema, type LoginFormValues } from "@/schemas/auth.schemas";
-import { ROUTES } from "@/constants/routes.constants";
+import { defaultRouteForRole } from "@/lib/roleRoutes";
 import type { ApiError } from "@/types/common.types";
 
 /**
@@ -25,9 +25,13 @@ export function useLogin() {
   const onSubmit = form.handleSubmit(async (values) => {
     try {
       const response = await authService.login(values);
-      setSession(response.token);
+      setSession(response.accessToken);
       toast.success(response.message);
-      navigate(ROUTES.DASHBOARD, { replace: true });
+
+      // Land the user on the page matching their role — the dashboard is
+      // business-role only (see lib/roleRoutes.ts).
+      const nextUser = useAuthStore.getState().user;
+      navigate(defaultRouteForRole(nextUser?.role), { replace: true });
     } catch (error) {
       // axiosInstance's response interceptor already normalizes every
       // rejection to ApiError — see services/api/axiosInstance.ts.

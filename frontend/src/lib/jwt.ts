@@ -8,10 +8,22 @@
  * call to a /me endpoint that doesn't exist yet.
  */
 
-/** Standard claims present in every token issued by JwtService.java. */
+/**
+ * Claims present in every access token issued by JwtService.java.
+ *
+ * The backend signs tokens with: sub (email), userId, fullName, role,
+ * iat and exp. Role is used for client-side navigation guards; the
+ * backend remains the source of truth for authorization.
+ */
 export interface DecodedAccessToken {
-  /** Subject — the user's email, per JwtService#generateToken. */
+  /** Subject — the user's email. */
   sub: string;
+  /** User id. */
+  userId: number;
+  /** User's full name. */
+  fullName: string;
+  /** Role name, e.g. "OWNER". */
+  role: string;
   /** Issued-at, epoch seconds. */
   iat: number;
   /** Expiry, epoch seconds. */

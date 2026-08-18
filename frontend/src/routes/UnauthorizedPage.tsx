@@ -3,26 +3,22 @@ import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/authStore";
 import { ROUTES } from "@/constants/routes.constants";
+import { defaultRouteForRole } from "@/lib/roleRoutes";
 
 /**
  * /unauthorized
  *
  * Shown when a signed-in user lacks permission for something.
  *
- * Not currently linked from any active guard: the backend's JWT carries
- * no role claim and there is no /me endpoint (see AuthenticatedUser in
- * auth.types.ts), so the frontend cannot yet determine a user's role
- * after login to enforce role-based access.
- *
- * TODO(backend): once the JWT includes a role claim, or GET /api/auth/me
- * returns one, add a role-based route guard (e.g. a RequireRole
- * component wrapping specific protected routes in AppRouter.tsx) that
- * redirects here when a signed-in user's role doesn't permit access.
+ * The "back" link is role-aware: the dashboard is business-role only
+ * (SA/OWNER/MANAGER), so a DELIVERY_BOY or SHOPKEEPER landing here is
+ * sent to the page matching their role instead of looping back.
  */
 export function UnauthorizedPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const backTo = isAuthenticated ? ROUTES.DASHBOARD : ROUTES.LOGIN;
-  const backLabel = isAuthenticated ? "Back to dashboard" : "Back to login";
+  const role = useAuthStore((state) => state.user?.role);
+  const backTo = isAuthenticated ? defaultRouteForRole(role) : ROUTES.LOGIN;
+  const backLabel = isAuthenticated ? "Back to your home" : "Back to login";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-6 text-center">

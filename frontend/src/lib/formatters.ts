@@ -77,6 +77,18 @@ export function formatRelativeTime(date: string | Date): string {
   return rtf.format(diffSec, "second");
 }
 
+/**
+ * Indian-rupee currency formatting used across every feature module
+ * (₹, en-IN locale, always 2 decimals). null/undefined/NaN -> ₹0.00.
+ */
+export function formatINR(amount: number | null | undefined): string {
+  if (amount == null || !Number.isFinite(amount)) return "₹0.00";
+  return `₹${amount.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 export function getInitials(name: string): string {
   return name
     .trim()

@@ -3,6 +3,7 @@ package com.distributrack.controller;
 import com.distributrack.dto.request.*;
 import com.distributrack.dto.response.AuthResponse;
 import com.distributrack.dto.response.RefreshTokenResponse;
+import com.distributrack.dto.response.UserResponse;
 import com.distributrack.security.JwtService;
 import com.distributrack.service.AuthService;
 import jakarta.validation.Valid;
@@ -29,6 +30,16 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request) {
 
         return authService.login(request);
+    }
+
+    /**
+     * Returns the currently authenticated user, resolved from the JWT
+     * principal in the security context. Deliberately takes NO userId
+     * parameter — the identity always comes from the token.
+     */
+    @GetMapping("/me")
+    public UserResponse me() {
+        return authService.getCurrentUser();
     }
 
     @PostMapping("/refresh")
@@ -59,6 +70,18 @@ public class AuthController {
         authService.changePassword(email, request);
 
         return "Password changed successfully";
+    }
+
+    @PutMapping("/profile")
+    public UserResponse updateProfile(
+            @RequestHeader("Authorization") String authHeader,
+            @Valid @RequestBody UpdateProfileRequest request) {
+
+        String token = authHeader.substring(7);
+
+        String email = jwtService.extractEmail(token);
+
+        return authService.updateProfile(email, request);
     }
 
     @PostMapping("/forgot-password")

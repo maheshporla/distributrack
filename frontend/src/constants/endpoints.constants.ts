@@ -1,65 +1,91 @@
 /**
  * REST endpoint paths, relative to `env.apiBaseUrl`.
  *
- * These are grouped to mirror the anticipated Spring Boot @RequestMapping
- * structure (e.g. AuthController -> /auth, ProductController -> /products)
- * so the frontend/backend contract stays predictable as features are added.
+ * These mirror the actual Spring Boot @RequestMapping structure
+ * (AuthController -> /api/auth, ProductController -> /api/products, ...)
+ * so the frontend/backend contract stays predictable as features are
+ * added. Every constant here corresponds to a real backend endpoint.
+ *
+ * Note: the backend is NOT envelope-wrapped — endpoints return their DTOs
+ * directly, and services return `response.data` as-is.
  */
 export const ENDPOINTS = {
-  /**
-   * Only /login and /register exist on the backend today (see
-   * AuthController.java). Do not add ME, REFRESH, LOGOUT,
-   * FORGOT_PASSWORD, RESET_PASSWORD, or VERIFY_EMAIL here until the
-   * corresponding Spring Boot endpoint actually exists — an endpoint
-   * constant pointing nowhere is worse than no constant at all.
-   *
-   * TODO(backend): add entries here as each endpoint ships:
-   *   - GET  /auth/me
-   *   - POST /auth/refresh
-   *   - POST /auth/logout
-   *   - POST /auth/forgot-password
-   *   - POST /auth/reset-password
-   *   - POST /auth/verify-email
-   */
   AUTH: {
     LOGIN: "/auth/login",
     REGISTER: "/auth/register",
+    ME: "/auth/me",
+    REFRESH: "/auth/refresh",
+    LOGOUT: "/auth/logout",
+    CHANGE_PASSWORD: "/auth/change-password",
+    PROFILE: "/auth/profile",
+    FORGOT_PASSWORD: "/auth/forgot-password",
+    RESET_PASSWORD: "/auth/reset-password",
   },
   PRODUCTS: {
     BASE: "/products",
     BY_ID: (id: string | number) => `/products/${id}`,
+    SEARCH: (keyword: string) => `/products/search?keyword=${encodeURIComponent(keyword)}`,
+    BY_CATEGORY: (category: string) => `/products/category/${encodeURIComponent(category)}`,
   },
   INVENTORY: {
     BASE: "/inventory",
-    BY_WAREHOUSE: (warehouseId: string | number) => `/inventory/warehouse/${warehouseId}`,
+    BY_ID: (id: string | number) => `/inventory/${id}`,
+    BY_PRODUCT: (productId: string | number) => `/inventory/product/${productId}`,
+    LOW_STOCK: "/inventory/low-stock",
+    /** Backend matches on the free-text warehouseLocation string, not an id. */
+    BY_WAREHOUSE: (warehouseLocation: string) =>
+      `/inventory/warehouse/${encodeURIComponent(warehouseLocation)}`,
   },
   WAREHOUSES: {
     BASE: "/warehouses",
     BY_ID: (id: string | number) => `/warehouses/${id}`,
+    ACTIVE: "/warehouses/active",
+    SEARCH: (keyword: string) => `/warehouses/search?keyword=${encodeURIComponent(keyword)}`,
+    BY_CITY: (city: string) => `/warehouses/city/${encodeURIComponent(city)}`,
+    BY_STATE: (state: string) => `/warehouses/state/${encodeURIComponent(state)}`,
   },
+  USERS: {
+    BASE: "/users",
+    BY_ID: (id: string | number) => `/users/${id}`,
+    BY_ROLE: (role: string) => `/users?role=${role}`,
+    SEARCH: (keyword: string) => `/users?search=${encodeURIComponent(keyword)}`,
+  },
+  /** Customers are SHOPKEEPER accounts managed through /api/users. */
   CUSTOMERS: {
-    BASE: "/customers",
-    BY_ID: (id: string | number) => `/customers/${id}`,
+    LIST: (search?: string) =>
+      `/users?role=SHOPKEEPER${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+    BY_ID: (id: string | number) => `/users/${id}`,
+  },
+  /** Delivery workers are DELIVERY_BOY accounts managed through /api/users. */
+  DELIVERY_WORKERS: {
+    LIST: (search?: string) =>
+      `/users?role=DELIVERY_BOY${search ? `&search=${encodeURIComponent(search)}` : ""}`,
+    BY_ID: (id: string | number) => `/users/${id}`,
   },
   ORDERS: {
     BASE: "/orders",
     BY_ID: (id: string | number) => `/orders/${id}`,
+    MY: "/orders/my",
+    STATUS: (id: string | number, status: string) => `/orders/${id}/status?status=${status}`,
+    BY_SHOPKEEPER: (shopkeeperId: string | number) => `/orders/shopkeeper/${shopkeeperId}`,
+    BY_STATUS: (status: string) => `/orders/status/${status}`,
   },
-  DELIVERY_WORKERS: {
-    BASE: "/delivery-workers",
-    BY_ID: (id: string | number) => `/delivery-workers/${id}`,
-  },
+  /** Backend controller is mapped at /api/delivery (singular). */
   DELIVERIES: {
-    BASE: "/deliveries",
-    BY_ID: (id: string | number) => `/deliveries/${id}`,
-  },
-  INVOICES: {
-    BASE: "/invoices",
-    BY_ID: (id: string | number) => `/invoices/${id}`,
+    BASE: "/delivery",
+    BY_ID: (id: string | number) => `/delivery/${id}`,
+    STATUS: (id: string | number, status: string) => `/delivery/${id}/status?status=${status}`,
+    LOCATION: (id: string | number) => `/delivery/${id}/location`,
+    BY_DELIVERY_BOY: (deliveryBoyId: string | number) => `/delivery/delivery-boy/${deliveryBoyId}`,
+    BY_STATUS: (status: string) => `/delivery/status/${status}`,
   },
   PAYMENTS: {
     BASE: "/payments",
     BY_ID: (id: string | number) => `/payments/${id}`,
+    STATUS: (id: string | number, status: string) => `/payments/${id}/status?status=${status}`,
+    BY_TRANSACTION: (transactionId: string) => `/payments/transaction/${transactionId}`,
+    BY_STATUS: (status: string) => `/payments/status/${status}`,
+    BY_METHOD: (paymentMethod: string) => `/payments/method/${paymentMethod}`,
   },
   ANALYTICS: {
     OVERVIEW: "/analytics/overview",
@@ -67,9 +93,16 @@ export const ENDPOINTS = {
   },
   REPORTS: {
     BASE: "/reports",
+    SALES: "/reports/sales",
+    INVENTORY: "/reports/inventory",
   },
   NOTIFICATIONS: {
     BASE: "/notifications",
     MARK_READ: (id: string | number) => `/notifications/${id}/read`,
+  },
+  /** One-time first-admin setup (guarded server-side to an empty users table). */
+  SETUP: {
+    STATUS: "/setup/status",
+    FIRST_ADMIN: "/setup/first-admin",
   },
 } as const;

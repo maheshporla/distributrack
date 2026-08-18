@@ -11,7 +11,11 @@ import java.util.Collection;
 import java.util.List;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+        @Index(name = "idx_users_role_id", columnList = "role_id"),
+        @Index(name = "idx_users_email", columnList = "email"),
+        @Index(name = "idx_users_phone", columnList = "phone")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,6 +38,17 @@ public class User implements UserDetails {
 
     @Column(nullable = false, unique = true, length = 15)
     private String phone;
+
+    /**
+     * B2B: the shop/business name (SHOPKEEPER accounts). Optional — staff
+     * accounts have no shop name.
+     */
+    @Column(name = "shop_name", length = 120)
+    private String shopName;
+
+    /** B2B: delivery/billing address (SHOPKEEPER accounts). Optional. */
+    @Column(length = 255)
+    private String address;
 
     @Column(nullable = false)
     @Builder.Default

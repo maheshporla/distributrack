@@ -12,10 +12,10 @@ import type { ApiError } from "@/types/common.types";
  * Encapsulates the Register form: validation, submission, and
  * post-registration navigation.
  *
- * Registration does NOT return a token (see RegisterApiResponse in
- * auth.types.ts) — the backend only confirms the account was created.
- * This hook therefore never touches authStore; it sends the user to
- * /login to sign in with their new credentials.
+ * The backend restricts public registration to the SHOPKEEPER role and
+ * returns a token pair, but the current UX intentionally sends the user
+ * to /login to sign in with their new credentials rather than
+ * auto-authenticating (see RegisterApiResponse in auth.types.ts).
  */
 export function useRegister() {
   const navigate = useNavigate();
@@ -26,7 +26,11 @@ export function useRegister() {
       fullName: "",
       email: "",
       phone: "",
-      role: undefined,
+      // Public registration is SHOPKEEPER-only — the backend rejects any
+      // other role (AuthServiceImpl), so the form always submits this.
+      role: "SHOPKEEPER",
+      shopName: "",
+      address: "",
       password: "",
       confirmPassword: "",
     },

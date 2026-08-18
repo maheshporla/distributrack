@@ -5,27 +5,21 @@ import type {
   LoginPayload,
   RegisterApiResponse,
   RegisterPayload,
+  UserProfile,
+  ChangePasswordPayload,
 } from "@/types/auth.types";
 
 /**
  * Authentication API calls.
  *
- * Calls `axiosInstance` directly rather than going through
- * `services/api/apiClient.ts`: `apiClient` unwraps responses assuming a
- * `{ success, message, data, timestamp }` envelope, but this backend's
- * auth endpoints return their DTOs directly (`{ token, message }` /
- * `{ message }`), with no envelope. Using `apiClient` here would silently
- * try to read `response.data.data`, which doesn't exist.
- *
- * Only /login and /register exist on the backend (see AuthController.java).
- * TODO(backend): add `getCurrentUser()`, `refreshToken()`, `logout()`,
- * `forgotPassword()`, `resetPassword()`, and `verifyEmail()` here once the
- * corresponding endpoints ship — do not stub them ahead of time.
+ * Calls `axiosInstance` directly, consistent with every other service:
+ * the backend returns DTOs directly (no envelope), so each service
+ * returns `response.data` as-is.
  */
 export const authService = {
   /**
    * Signs a user in.
-   * @returns The issued JWT and a confirmation message.
+   * @returns The issued JWT pair and a confirmation message.
    */
   async login(payload: LoginPayload): Promise<LoginApiResponse> {
     const response = await axiosInstance.post<LoginApiResponse>(
@@ -36,16 +30,65 @@ export const authService = {
   },
 
   /**
-   * Registers a new user.
+   * Registers a new SHOPKEEPER account.
    *
-   * Returns only a confirmation message — registration does NOT return a
-   * token, so the caller must route the user to sign in afterwards
-   * rather than treating this as an auto-login.
+   * Public registration is restricted to the SHOPKEEPER role server-side
+   * (see AuthServiceImpl.java); staff accounts are created via the
+   * authenticated /api/users endpoints.
    */
   async register(payload: RegisterPayload): Promise<RegisterApiResponse> {
     const response = await axiosInstance.post<RegisterApiResponse>(
       ENDPOINTS.AUTH.REGISTER,
       payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Returns the currently authenticated user, resolved from the JWT
+   * principal server-side (GET /api/auth/me — no userId parameter).
+   */
+  async getMe(): Promise<UserProfile> {
+    const response = await axiosInstance.get<UserProfile>(ENDPOINTS.AUTH.ME);
+    return response.data;
+  },
+
+  async changePassword(payload: ChangePasswordPayload): Promise<string> {
+    const response = await axiosInstance.put<string>(
+      ENDPOINTS.AUTH.CHANGE_PASSWORD,
+      payload,
+    );
+    return response.data;
+  },
+
+  async updateProfile(payload: { fullName: string; phone: string }): Promise<UserProfile> {
+    const response = await axiosInstance.put<UserProfile>(
+      ENDPOINTS.AUTH.PROFILE,
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Request a password reset link. The backend sends an email with a
+   * secure token link. Returns a generic success message regardless of
+   * whether the email exists — prevents user enumeration.
+   */
+  async forgotPassword(email: string): Promise<string> {
+    const response = await axiosInstance.post<string>(
+      ENDPOINTS.AUTH.FORGOT_PASSWORD,
+      { email },
+    );
+    return response.data;
+  },
+
+  /**
+   * Reset the password using a valid token from the email link.
+   */
+  async resetPassword(token: string, newPassword: string): Promise<string> {
+    const response = await axiosInstance.post<string>(
+      ENDPOINTS.AUTH.RESET_PASSWORD,
+      { token, newPassword },
     );
     return response.data;
   },

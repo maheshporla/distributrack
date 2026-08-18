@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { AuthCard } from "@/features/auth/components/AuthCard";
 import { useLogin } from "@/features/auth/hooks/useLogin";
 import { Label } from "@/components/ui/label";
@@ -6,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/shared/PasswordInput";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes.constants";
+import { setupService } from "@/services/api/setupService";
 
 /**
  * /login
@@ -21,6 +23,39 @@ export function LoginPage() {
     formState: { errors },
   } = form;
 
+  // On a fresh system (no SUPER_ADMIN exists) redirect to the setup page.
+  const [isChecking, setIsChecking] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    setupService
+      .getStatus()
+      .then(({ setupRequired }) => {
+        if (!cancelled && setupRequired) {
+          navigate(ROUTES.SETUP_FIRST_ADMIN, { replace: true });
+        }
+      })
+      .catch(() => {
+        // Non-fatal: show the login form if the status call fails.
+      })
+      .finally(() => {
+        if (!cancelled) setIsChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
+  // Show loading spinner while checking setup status
+  if (isChecking) {
+    return (
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
+        <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <AuthCard
       title="Welcome back"
@@ -34,6 +69,7 @@ export function LoginPage() {
         </p>
       }
     >
+
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
@@ -53,7 +89,15 @@ export function LoginPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Link
+              to={ROUTES.FORGOT_PASSWORD}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <PasswordInput
             id="password"
             autoComplete="current-password"

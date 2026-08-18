@@ -4,18 +4,22 @@ import com.distributrack.dto.request.ProductRequest;
 import com.distributrack.dto.response.ProductResponse;
 import com.distributrack.entity.Product;
 import com.distributrack.repository.ProductRepository;
+import com.distributrack.service.AuditService;
 import com.distributrack.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
+    private final AuditService auditService;
 
     @Override
     public ProductResponse createProduct(ProductRequest request) {
@@ -39,6 +43,10 @@ public class ProductServiceImpl implements ProductService {
 
         productRepository.save(product);
 
+        auditService.log("PRODUCT_CREATE", "Product", product.getId(),
+                "Product created: " + product.getProductName()
+                        + " (SKU " + product.getSku() + ", ₹" + product.getPrice() + ")");
+
         return mapToResponse(product);
     }
 
@@ -47,6 +55,14 @@ public class ProductServiceImpl implements ProductService {
 
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        // Reject a SKU that belongs to a DIFFERENT product (a clean 400
+        // instead of a database unique-constraint 500).
+        productRepository.findBySku(request.getSku())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new RuntimeException("Product SKU already exists");
+                });
 
         product.setProductName(request.getProductName());
         product.setDescription(request.getDescription());
@@ -60,6 +76,10 @@ public class ProductServiceImpl implements ProductService {
 
         productRepository.save(product);
 
+        auditService.log("PRODUCT_UPDATE", "Product", product.getId(),
+                "Product updated: " + product.getProductName()
+                        + " (SKU " + product.getSku() + ", ₹" + product.getPrice() + ")");
+
         return mapToResponse(product);
     }
 
@@ -68,6 +88,10 @@ public class ProductServiceImpl implements ProductService {
 
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
+
+        auditService.log("PRODUCT_DELETE", "Product", id,
+                "Product deleted: " + product.getProductName()
+                        + " (SKU " + product.getSku() + ")");
 
         productRepository.delete(product);
     }

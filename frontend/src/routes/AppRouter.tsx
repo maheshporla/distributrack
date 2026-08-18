@@ -1,15 +1,58 @@
+import { lazy, Suspense } from "react";
+import { DashboardPage } from "@/features/dashboard/pages/DashboardPage";
+import { ShopkeeperDashboardPage } from "@/features/dashboard/pages/ShopkeeperDashboardPage";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { ShopkeeperLayout } from "@/components/layout/ShopkeeperLayout";
 import { GuestRoute } from "@/routes/GuestRoute";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
-import { PlaceholderPage } from "@/routes/PlaceholderPage";
-import { ScaffoldPreviewPage } from "@/routes/ScaffoldPreviewPage";
 import { NotFoundPage } from "@/routes/NotFoundPage";
 import { UnauthorizedPage } from "@/routes/UnauthorizedPage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { RegisterPage } from "@/features/auth/pages/RegisterPage";
+import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
 import { ROUTES } from "@/constants/routes.constants";
+import { ProductsPage } from "@/features/products/pages/ProductsPage";
+import { InventoryPage } from "@/features/inventory/pages/InventoryPage";
+import { WarehousesPage } from "@/features/warehouses/pages/WarehousesPage";
+import { OrdersPage } from "@/features/orders/pages/OrdersPage";
+import { CustomersPage } from "@/features/customers/pages/CustomersPage";
+import { DeliveryWorkersPage } from "@/features/delivery-workers/pages/DeliveryWorkersPage";
+import { DeliveriesPage } from "@/features/deliveries/pages/DeliveriesPage";
+import { PaymentsPage } from "@/features/payments/pages/PaymentsPage";
+import { InvoicesPage } from "@/features/invoices/pages/InvoicesPage";
+import { NotificationsPage } from "@/features/notifications/pages/NotificationsPage";
+import { SettingsPage } from "@/features/settings/pages/SettingsPage";
+import { RequireRole } from "@/routes/RequireRole";
+import { UsersManagementPage } from "@/features/users/pages/UsersManagementPage";
+import { FirstAdminSetupPage } from "@/features/setup/pages/FirstAdminSetupPage";
+
+/**
+ * Analytics and Reports are the only Recharts-heavy pages; lazy-loading
+ * keeps the shared chunk small (Recharts ships in a separate chunk that
+ * is only fetched when one of these routes is visited).
+ */
+const AnalyticsPage = lazy(() =>
+  import("@/features/analytics/pages/AnalyticsPage").then((m) => ({
+    default: m.AnalyticsPage,
+  })),
+);
+const ReportsPage = lazy(() =>
+  import("@/features/reports/pages/ReportsPage").then((m) => ({
+    default: m.ReportsPage,
+  })),
+);
+
+/** Simple centered spinner used while lazy chunks load. */
+function RouteLoading() {
+  return (
+    <div className="flex h-64 items-center justify-center text-muted-foreground">
+      <span className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    </div>
+  );
+}
 
 /**
  * Central route tree.
@@ -25,8 +68,8 @@ import { ROUTES } from "@/constants/routes.constants";
  *   redirects here yet — see UnauthorizedPage.tsx for why.
  * - Every other known route renders inside DashboardLayout, guarded by
  *   ProtectedRoute (redirects to /login when unauthenticated).
- * - Feature pages other than the auth flow are still PlaceholderPage
- *   stand-ins until their own phase of the build implements them.
+ * - Customers and Settings are still PlaceholderPage stand-ins (not yet
+ *   built); every other feature renders a real page.
  */
 export function AppRouter() {
   return (
@@ -40,6 +83,15 @@ export function AppRouter() {
         <Route element={<AuthLayout />}>
           <Route path={ROUTES.LOGIN} element={<LoginPage />} />
           <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+          <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+          <Route path={ROUTES.RESET_PASSWORD} element={<ResetPasswordPage />} />
+          {/* One-time bootstrap — the page itself redirects to /login when
+              the system is already initialized; the backend rejects calls
+              once any user exists. */}
+          <Route
+            path={ROUTES.SETUP_FIRST_ADMIN}
+            element={<FirstAdminSetupPage />}
+          />
         </Route>
       </Route>
 
@@ -58,120 +110,212 @@ export function AppRouter() {
           </ProtectedRoute>
         }
       >
-        <Route path={ROUTES.DASHBOARD} element={<ScaffoldPreviewPage />} />
-
         <Route
-          path={ROUTES.PRODUCTS}
+          path={ROUTES.DASHBOARD}
           element={
-            <PlaceholderPage
-              title="Products"
-              description="Manage your product catalog."
-            />
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+              <DashboardPage />
+            </RequireRole>
           }
         />
-        <Route
-          path={ROUTES.INVENTORY}
-          element={
-            <PlaceholderPage
-              title="Inventory"
-              description="Track stock levels across warehouses."
-            />
-          }
-        />
+<Route
+  path={ROUTES.PRODUCTS}
+  element={
+    <RequireRole
+      roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN", "SHOPKEEPER"]}
+    >
+      <ProductsPage />
+    </RequireRole>
+  }
+/>
+<Route
+  path={ROUTES.INVENTORY}
+  element={
+    <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN"]}>
+      <InventoryPage />
+    </RequireRole>
+  }
+/>
         <Route
           path={ROUTES.WAREHOUSES}
           element={
-            <PlaceholderPage
-              title="Warehouses"
-              description="Manage warehouse locations and capacity."
-            />
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+              <WarehousesPage />
+            </RequireRole>
           }
         />
         <Route
           path={ROUTES.CUSTOMERS}
           element={
-            <PlaceholderPage
-              title="Customers"
-              description="View and manage your customer accounts."
-            />
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN"]}>
+              <CustomersPage />
+            </RequireRole>
           }
         />
         <Route
           path={ROUTES.ORDERS}
           element={
-            <PlaceholderPage
-              title="Orders"
-              description="Track and fulfill customer orders."
-            />
+            <RequireRole
+              roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN", "SHOPKEEPER"]}
+            >
+              <OrdersPage />
+            </RequireRole>
           }
         />
         <Route
           path={ROUTES.DELIVERY_WORKERS}
           element={
-            <PlaceholderPage
-              title="Delivery Workers"
-              description="Manage your delivery staff."
-            />
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+              <DeliveryWorkersPage />
+            </RequireRole>
           }
         />
         <Route
           path={ROUTES.DELIVERIES}
           element={
-            <PlaceholderPage
-              title="Deliveries"
-              description="Track delivery routes and status."
-            />
+            <RequireRole
+              roles={["SUPER_ADMIN", "OWNER", "MANAGER", "DELIVERY_BOY", "SHOPKEEPER"]}
+            >
+              <DeliveriesPage />
+            </RequireRole>
           }
         />
         <Route
           path={ROUTES.INVOICES}
           element={
-            <PlaceholderPage title="Invoices" description="Manage customer invoices." />
+            <RequireRole
+              roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN", "SHOPKEEPER"]}
+            >
+              <InvoicesPage />
+            </RequireRole>
           }
         />
         <Route
           path={ROUTES.PAYMENTS}
           element={
-            <PlaceholderPage
-              title="Payments"
-              description="Track payments and outstanding balances."
-            />
+            <RequireRole
+              roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN", "SHOPKEEPER"]}
+            >
+              <PaymentsPage />
+            </RequireRole>
           }
         />
         <Route
           path={ROUTES.ANALYTICS}
           element={
-            <PlaceholderPage
-              title="Analytics"
-              description="Business performance at a glance."
-            />
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+              <Suspense fallback={<RouteLoading />}>
+                <AnalyticsPage />
+              </Suspense>
+            </RequireRole>
           }
         />
         <Route
           path={ROUTES.REPORTS}
           element={
-            <PlaceholderPage
-              title="Reports"
-              description="Generate and export operational reports."
-            />
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+              <Suspense fallback={<RouteLoading />}>
+                <ReportsPage />
+              </Suspense>
+            </RequireRole>
           }
         />
         <Route
           path={ROUTES.NOTIFICATIONS}
-          element={
-            <PlaceholderPage
-              title="Notifications"
-              description="Stay on top of important updates."
-            />
-          }
+          element={<NotificationsPage />}
         />
         <Route
           path={ROUTES.SETTINGS}
           element={
-            <PlaceholderPage
-              title="Settings"
-              description="Manage your account and preferences."
-            />
+            <RequireRole
+              roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN", "DELIVERY_BOY", "SHOPKEEPER"]}
+            >
+              <SettingsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.USERS}
+          element={
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+              <UsersManagementPage />
+            </RequireRole>
+          }
+        />
+      </Route>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* Shopkeeper portal — separate layout, SHOPKEEPER only             */}
+      {/* ---------------------------------------------------------------- */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <ShopkeeperLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route
+          path={ROUTES.SHOPKEEPER_DASHBOARD}
+          element={
+            <RequireRole roles={["SHOPKEEPER"]}>
+              <ShopkeeperDashboardPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.SHOPKEEPER_PRODUCTS}
+          element={
+            <RequireRole roles={["SHOPKEEPER"]}>
+              <ProductsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.SHOPKEEPER_ORDERS}
+          element={
+            <RequireRole roles={["SHOPKEEPER"]}>
+              <OrdersPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.SHOPKEEPER_DELIVERIES}
+          element={
+            <RequireRole roles={["SHOPKEEPER"]}>
+              <DeliveriesPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.SHOPKEEPER_INVOICES}
+          element={
+            <RequireRole roles={["SHOPKEEPER"]}>
+              <InvoicesPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.SHOPKEEPER_PAYMENTS}
+          element={
+            <RequireRole roles={["SHOPKEEPER"]}>
+              <PaymentsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.SHOPKEEPER_NOTIFICATIONS}
+          element={
+            <RequireRole roles={["SHOPKEEPER"]}>
+              <NotificationsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.SHOPKEEPER_SETTINGS}
+          element={
+            <RequireRole roles={["SHOPKEEPER"]}>
+              <SettingsPage />
+            </RequireRole>
           }
         />
       </Route>

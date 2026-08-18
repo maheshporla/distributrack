@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, LogOut, Menu, Moon, Search, Settings, Sun, User } from "lucide-react";
+import { Bell, CheckCheck, LogOut, Menu, Moon, Search, Settings, Sun, User } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,10 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SidebarNav } from "@/components/layout/SidebarNav";
 import { ROUTES } from "@/constants/routes.constants";
+import { getInitials, formatRelativeTime } from "@/lib/formatters";
 import { useAuthStore } from "@/store/authStore";
+import { useNotificationStore, startNotificationPolling, stopNotificationPolling } from "@/store/notificationStore";
+import { notificationRoute } from "@/types/notification.types";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 
 /**
@@ -30,10 +33,17 @@ export function Navbar() {
   const user = useAuthStore((state) => state.user);
   const logout = useLogout();
 
-  // TODO(backend): once AuthenticatedUser carries a fullName (see
-  // auth.types.ts), replace this email-derived fallback with real
-  // initials from the user's name.
-  const initials = user ? user.email.slice(0, 2).toUpperCase() : "DT";
+  const notifications = useNotificationStore((state) => state.notifications);
+  const unreadCount = useNotificationStore((state) => state.unreadCount);
+  const markAllAsRead = useNotificationStore((state) => state.markAllAsRead);
+
+  // Start the lightweight notification poller while the navbar is mounted.
+  useEffect(() => {
+    startNotificationPolling();
+    return stopNotificationPolling;
+  }, []);
+
+  const initials = user?.fullName ? getInitials(user.fullName) : "DT";
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6">
@@ -80,12 +90,84 @@ export function Navbar() {
         </Button>
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" asChild aria-label="Notifications">
-          <Link to={ROUTES.NOTIFICATIONS} className="relative">
-            <Bell className="size-4.5" />
-            <span className="absolute right-1.5 top-1.5 flex size-2 rounded-full bg-destructive" />
-          </Link>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Notifications">
+              <span className="relative">
+                <Bell className="size-4.5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end" className="w-80">
+            <div className="flex items-center justify-between px-2 py-1.5">
+              <DropdownMenuLabel className="font-medium">
+                Notifications
+              </DropdownMenuLabel>
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void markAllAsRead()}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <CheckCheck className="h-3.5 w-3.5" />
+                  Mark all read
+                </button>
+              )}
+            </div>
+
+            <DropdownMenuSeparator />
+
+            {notifications.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No notifications yet.
+              </p>
+            ) : (
+              <div className="max-h-80 overflow-y-auto">
+                {notifications.slice(0, 5).map((notification) => (
+                  <DropdownMenuItem key={notification.id} asChild>
+                    <Link
+                      to={notificationRoute(notification.type)}
+                      className="flex items-start gap-2.5 px-3 py-2"
+                    >
+                      <span
+                        className={
+                          notification.read
+                            ? "mt-1.5 size-2 shrink-0 rounded-full bg-transparent"
+                            : "mt-1.5 size-2 shrink-0 rounded-full bg-primary"
+                        }
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">
+                          {notification.title}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {notification.message}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-muted-foreground/70">
+                          {formatRelativeTime(notification.createdAt)}
+                        </span>
+                      </span>
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            )}
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem asChild>
+              <Link to={ROUTES.NOTIFICATIONS} className="justify-center font-medium">
+                View all notifications
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Account menu */}
         <DropdownMenu>
@@ -98,18 +180,17 @@ export function Navbar() {
                 <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               <span className="hidden max-w-[120px] truncate text-sm font-medium sm:inline">
-                {user?.email ?? "Account"}
+                {user?.fullName ?? "Account"}
               </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="font-normal">
-              {/* TODO(backend): show the user's full name here once the
-                  backend exposes it (no /me endpoint, no name claim in the
-                  JWT today — see AuthenticatedUser in auth.types.ts). Email
-                  is the only identifier available client-side right now. */}
               <p className="truncate text-sm font-medium text-foreground">
-                {user?.email ?? "Guest User"}
+                {user?.fullName ?? "Guest User"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {user?.email}
               </p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

@@ -1,31 +1,47 @@
 import { create } from "zustand";
 import { STORAGE_KEYS } from "@/constants/app.constants";
 import { decodeJwt, isTokenExpired } from "@/lib/jwt";
-import type { AuthenticatedUser } from "@/types/auth.types";
+import { ROLE_NAMES, type AuthenticatedUser, type RoleName } from "@/types/auth.types";
 
 interface AuthState {
   /** Raw JWT access token, also mirrored in localStorage for axiosInstance to read. */
   token: string | null;
   user: AuthenticatedUser | null;
+
+  
   isAuthenticated: boolean;
 
   /** Persists the token and derives `user` from it after a successful login. */
   setSession: (token: string) => void;
   /** Clears the session locally. Purely client-side — see useLogout for details. */
   clearSession: () => void;
+  /** Updates the local user cache (e.g. name) during profile editing. */
+  updateUser: (updatedUser: Partial<AuthenticatedUser>) => void;
 }
 
 /**
  * Derives the client-side user from a JWT's decoded claims.
  *
- * TODO(backend): once GET /api/auth/me exists (or the JWT carries id/role/
- * fullName claims), replace this with the richer response and drop the
- * manual decode.
+ * The backend now signs access tokens with userId, fullName and role
+ * claims (see JwtService.java), so the session can be built synchronously
+ * from the token without a /me round-trip. The role claim is validated
+ * against the known role list before being trusted.
  */
 function buildUserFromToken(token: string): AuthenticatedUser | null {
   const decoded = decodeJwt(token);
   if (!decoded) return null;
-  return { email: decoded.sub, tokenExpiresAt: decoded.exp };
+
+  const role: RoleName = ROLE_NAMES.includes(decoded.role as RoleName)
+    ? (decoded.role as RoleName)
+    : "SHOPKEEPER";
+
+  return {
+    id: decoded.userId,
+    email: decoded.sub,
+    fullName: decoded.fullName,
+    role,
+    tokenExpiresAt: decoded.exp,
+  };
 }
 
 /**
@@ -59,6 +75,18 @@ export const useAuthStore = create<AuthState>()((set) => {
     clearSession: () => {
       localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
       set({ token: null, user: null, isAuthenticated: false });
+    },
+
+    updateUser: (updatedUser) => {
+      set((state) => {
+        if (!state.user) return state;
+        return {
+          user: {
+            ...state.user,
+            ...updatedUser,
+          },
+        };
+      });
     },
   };
 });

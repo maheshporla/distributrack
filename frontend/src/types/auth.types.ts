@@ -2,19 +2,30 @@
  * Authentication types — mirror the Spring Boot backend's actual DTOs.
  *
  * Backend reference:
- *   - AuthController:  POST /api/auth/register, POST /api/auth/login
+ *   - AuthController: POST /api/auth/register, /login, /refresh, /logout,
+ *     /change-password, /forgot-password, /reset-password, GET /me
  *   - LoginRequest:    { email, password }
  *   - RegisterRequest: { fullName, email, password, phone, role }
- *   - RoleName (enum): ADMIN | DISTRIBUTOR | SHOPKEEPER | WORKER
- *   - Register response: { message }               (no token — no auto-login)
- *   - Login response:    { token, message }
+ *   - RoleName (enum): SUPER_ADMIN | OWNER | MANAGER | SALESMAN |
+ *                      DELIVERY_BOY | SHOPKEEPER
+ *   - Register/Login response: { accessToken, refreshToken, message }
+ *   - /me response: UserResponse { id, fullName, email, phone, role,
+ *                                 enabled, createdAt }
  *
  * Do not add fields the backend doesn't send/accept without confirming
  * against the actual Java DTOs first.
  */
 
 /** Mirrors com.distributrack.enums.RoleName exactly. */
-export const ROLE_NAMES = ["ADMIN", "DISTRIBUTOR", "SHOPKEEPER", "WORKER"] as const;
+export const ROLE_NAMES = [
+  "SUPER_ADMIN",
+  "OWNER",
+  "MANAGER",
+  "SALESMAN",
+  "DELIVERY_BOY",
+  "SHOPKEEPER",
+] as const;
+
 export type RoleName = (typeof ROLE_NAMES)[number];
 
 // ---------------------------------------------------------------------------
@@ -33,6 +44,10 @@ export interface RegisterPayload {
   email: string;
   password: string;
   phone: string;
+  /** B2B: shop/business name (optional). */
+  shopName?: string;
+  /** B2B: shop address (optional). */
+  address?: string;
   role: RoleName;
 }
 
@@ -40,20 +55,37 @@ export interface RegisterPayload {
 // Response payloads (received from the backend)
 // ---------------------------------------------------------------------------
 
-/** Matches the backend's login response: { token, message }. */
+/** Matches AuthResponse.java: { accessToken, refreshToken, message }. */
 export interface LoginApiResponse {
-  token: string;
+  accessToken: string;
+  refreshToken: string;
   message: string;
 }
 
 /**
- * Matches the backend's register response: { message } only.
- * Registration does NOT return a token — the user must log in
- * separately afterwards. Do not attempt to auto-authenticate on
- * register success.
+ * Matches AuthResponse.java — registration returns tokens too, but the
+ * current UX intentionally routes the user to /login afterwards (see
+ * useRegister.ts) rather than auto-authenticating.
  */
 export interface RegisterApiResponse {
+  accessToken: string;
+  refreshToken: string;
   message: string;
+}
+
+/** Matches com.distributrack.dto.response.UserResponse (GET /api/auth/me). */
+export interface UserProfile {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  /** B2B: shop/business name (SHOPKEEPER accounts). Nullable. */
+  shopName?: string | null;
+  /** B2B: shop address. Nullable. */
+  address?: string | null;
+  role: RoleName;
+  enabled: boolean;
+  createdAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,19 +93,21 @@ export interface RegisterApiResponse {
 // ---------------------------------------------------------------------------
 
 /**
- * The signed-in user, as far as the client can genuinely know it.
- *
- * The backend does not return a user object on login and has no /me
- * endpoint. The JWT itself only carries `sub` (email), `iat`, and `exp`
- * — no id, role, or name claims. So this type intentionally contains
- * only what can be decoded from the token today.
- *
- * TODO(backend): once a GET /api/auth/me endpoint exists, or the JWT is
- * extended with additional claims (id, role, fullName), extend this
- * type and update `buildUserFromToken` in `store/authStore.ts` to match.
+ * The signed-in user, derived from the JWT claims issued by
+ * JwtService.java (sub=email, userId, fullName, role, exp). Passwords
+ * are never stored or decoded client-side.
  */
 export interface AuthenticatedUser {
+  id: number;
   email: string;
+  fullName: string;
+  role: RoleName;
   /** JWT `exp` claim, epoch seconds — lets the client pre-empt an expired token. */
   tokenExpiresAt: number;
+}
+
+/** Matches ChangePasswordRequest.java. */
+export interface ChangePasswordPayload {
+  oldPassword: string;
+  newPassword: string;
 }

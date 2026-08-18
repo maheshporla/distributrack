@@ -27,7 +27,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         refreshTokenRepository.deleteByUserId(user.getId());
 
         // Generate new tokens
-        String accessToken = jwtService.generateAccessToken(user.getEmail());
+        String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
 
         // Save refresh token
@@ -61,7 +61,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         }
 
         String newAccessToken =
-                jwtService.generateAccessToken(token.getUser().getEmail());
+                jwtService.generateAccessToken(token.getUser());
 
         return RefreshTokenResponse.builder()
                 .accessToken(newAccessToken)

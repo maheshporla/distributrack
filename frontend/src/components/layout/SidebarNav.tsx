@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { Package2 } from "lucide-react";
 import { NAV_SECTIONS } from "@/components/layout/nav-config";
+import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/constants/app.constants";
 
@@ -15,6 +16,19 @@ interface SidebarNavProps {
  * two never drift out of sync.
  */
 export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
+  // Role-driven nav: items without `roles` are visible to everyone;
+  // items with `roles` are filtered against the JWT role claim so e.g.
+  // Warehouse management never appears for SALESMAN / DELIVERY_BOY /
+  // SHOPKEEPER. Empty sections are dropped entirely.
+  const role = useAuthStore((state) => state.user?.role);
+
+  const visibleSections = NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items.filter(
+      (item) => !item.roles || (role && item.roles.includes(role)),
+    ),
+  })).filter((section) => section.items.length > 0);
+
   return (
     <div className="flex h-full flex-col">
       <div
@@ -34,7 +48,7 @@ export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-3 scrollbar-thin">
-        {NAV_SECTIONS.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title}>
             {!collapsed && (
               <p className="mb-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">

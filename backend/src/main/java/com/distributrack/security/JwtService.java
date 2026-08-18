@@ -1,9 +1,11 @@
 package com.distributrack.security;
 
+import com.distributrack.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -13,8 +15,13 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    private static final String SECRET =
-            "MyDistribuTrackSecretKeyMyDistribuTrackSecretKey12345";
+    /**
+     * Signing secret. Override via the APP_JWT_SECRET environment
+     * variable in production; the default keeps local development
+     * tokens working as before.
+     */
+    @Value("${app.jwt.secret:MyDistribuTrackSecretKeyMyDistribuTrackSecretKey12345}")
+    private String secret = "MyDistribuTrackSecretKeyMyDistribuTrackSecretKey12345";
 
     private static final long ACCESS_TOKEN_EXPIRATION =
             1000L * 60 * 15;          // 15 Minutes
@@ -22,17 +29,37 @@ public class JwtService {
     private static final long REFRESH_TOKEN_EXPIRATION =
             1000L * 60 * 60 * 24 * 7; // 7 Days
 
-    private final SecretKey secretKey =
-            Keys.hmacShaKeyFor(SECRET.getBytes());
+    private SecretKey secretKey;
 
-    public String generateAccessToken(String email) {
+    /** Lazy so both Spring (@Value injects) and plain instantiation work. */
+    private SecretKey secretKey() {
+        if (secretKey == null) {
+            secretKey = Keys.hmacShaKeyFor(secret.getBytes());
+        }
+        return secretKey;
+    }
+
+    /**
+     * Issues an access token carrying the claims the client needs for
+     * role-based behavior:
+     *   - sub      -> email (kept for backward compatibility)
+     *   - userId   -> user id
+     *   - fullName -> user's full name
+     *   - role     -> role name (e.g. OWNER)
+     *
+     * Passwords are never embedded in the token.
+     */
+    public String generateAccessToken(User user) {
 
         return Jwts.builder()
-                .subject(email)
+                .subject(user.getEmail())
+                .claim("userId", user.getId())
+                .claim("fullName", user.getFullName())
+                .claim("role", user.getRole().getName().name())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis()
                         + ACCESS_TOKEN_EXPIRATION))
-                .signWith(secretKey, SignatureAlgorithm.HS256)
+                .signWith(secretKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -43,13 +70,8 @@ public class JwtService {
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis()
                         + REFRESH_TOKEN_EXPIRATION))
-                .signWith(secretKey, SignatureAlgorithm.HS256)
+                .signWith(secretKey(), SignatureAlgorithm.HS256)
                 .compact();
-    }
-
-    // Temporary compatibility with existing code
-    public String generateToken(String email) {
-        return generateAccessToken(email);
     }
 
     public String extractEmail(String token) {
@@ -60,7 +82,7 @@ public class JwtService {
                               Function<Claims, T> resolver) {
 
         Claims claims = Jwts.parser()
-                .verifyWith(secretKey)
+                .verifyWith(secretKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();

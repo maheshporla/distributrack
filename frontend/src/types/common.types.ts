@@ -1,28 +1,4 @@
 /**
- * Shape returned by the Spring Boot backend for a single-resource response.
- * Keep this aligned with the backend's global `ApiResponse<T>` wrapper.
- */
-export interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  data: T;
-  timestamp: string;
-}
-
-/**
- * Shape returned for paginated list endpoints (mirrors Spring's Page<T>).
- */
-export interface PaginatedResponse<T> {
-  content: T[];
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-  first: boolean;
-  last: boolean;
-}
-
-/**
  * Normalized error shape produced by the Axios error interceptor.
  * Every thrown error from the service layer conforms to this.
  */

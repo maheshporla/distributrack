@@ -7,15 +7,14 @@ import { ROUTES } from "@/constants/routes.constants";
 /**
  * Signs the user out.
  *
- * This is a purely client-side operation: it clears the locally stored
- * JWT and session state, then redirects to /login. The backend has no
- * session to invalidate today — AuthController only exposes /login and
- * /register — so there is nothing to call.
+ * Currently a client-side operation: it clears the locally stored JWT
+ * and session state, then redirects to /login. The backend exposes
+ * POST /api/auth/logout (which revokes the stored refresh token) but it
+ * requires the refresh token that the client does not persist yet.
  *
- * TODO(backend): once POST /api/auth/logout exists (e.g. to blacklist
- * the token or revoke a future refresh token), call it here, before
- * `clearSession()`, and treat a failure as non-blocking — the local
- * session should still be cleared even if the server call fails.
+ * TODO(auth): persist the refresh token and call POST /api/auth/logout
+ * before `clearSession()`, treating a failure as non-blocking — the
+ * local session should still be cleared even if the server call fails.
  */
 export function useLogout() {
   const clearSession = useAuthStore((state) => state.clearSession);

@@ -49,6 +49,14 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Email notifications (JavaMail). Configuration is env-driven
+             (MAIL_HOST / MAIL_USERNAME / MAIL_PASSWORD); when unset the
+             EmailService runs in mock mode and only logs. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- MySQL -->
         <dependency>
             <groupId>com.mysql</groupId>

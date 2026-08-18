@@ -1,0 +1,28 @@
+# ====================================================================
+# DistribuTrack — Root .gitignore
+# ====================================================================
+
+# Local development configuration (contains real credentials)
+backend/src/main/resources/application-local.properties
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Build output
+backend/target/
+frontend/dist/
+frontend/node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

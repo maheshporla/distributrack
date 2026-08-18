@@ -75,18 +75,18 @@ src/
 
 ## Backend Integration
 
-The API layer is pre-wired for a Spring Boot REST backend:
+The API layer is wired to the Spring Boot REST backend:
 
-- `VITE_API_BASE_URL` in `.env.*` points at the backend (default `http://localhost:8080/api/v1`)
+- `VITE_API_BASE_URL` in `.env.*` points at the backend (default `http://localhost:8080`)
 - `src/services/api/axiosInstance.ts` attaches the bearer token to every request and
   transparently refreshes it on a 401 (queuing concurrent requests during the refresh)
-- `src/services/api/apiClient.ts` unwraps the backend's `ApiResponse<T>` / `Page<T>`
-  envelopes so feature services work with plain types
-- `src/constants/endpoints.constants.ts` mirrors the anticipated Spring Boot
-  `@RequestMapping` structure, one group per controller
+- The backend returns DTOs directly (no `ApiResponse<T>` envelope), so every
+  feature service returns `response.data` as-is
+- `src/constants/endpoints.constants.ts` mirrors the Spring Boot controller
+  mappings, one group per controller
 
-Feature services (e.g. `productService.ts`) should be built on top of `apiClient`,
-never by calling `axios` directly from components.
+Feature services (e.g. `productService.ts`) call `axiosInstance` directly — never
+`axios` from components.
 
 ## Design System
 

@@ -1,4 +1,3 @@
-import { Controller } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { AuthCard } from "@/features/auth/components/AuthCard";
 import { useRegister } from "@/features/auth/hooks/useRegister";
@@ -6,20 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/shared/PasswordInput";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ROUTES } from "@/constants/routes.constants";
-import { ROLE_NAMES } from "@/types/auth.types";
-
-/** "SHOPKEEPER" -> "Shopkeeper" - display only, doesn't affect the value sent to the backend. */
-function formatRoleLabel(role: string): string {
-  return role.charAt(0) + role.slice(1).toLowerCase();
-}
 
 /**
  * /register
@@ -32,7 +18,6 @@ export function RegisterPage() {
   const { form, onSubmit, isSubmitting } = useRegister();
   const {
     register,
-    control,
     formState: { errors },
   } = form;
 
@@ -100,36 +85,45 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="role">Role</Label>
-          <Controller
-            control={control}
-            name="role"
-            render={({ field, fieldState }) => (
-              <Select
-                value={field.value}
-                onValueChange={field.onChange}
-                disabled={isSubmitting}
-              >
-                <SelectTrigger
-                  id="role"
-                  invalid={!!fieldState.error}
-                  onBlur={field.onBlur}
-                >
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLE_NAMES.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {formatRoleLabel(role)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+          <Label htmlFor="shopName">Shop / Business Name</Label>
+          <Input
+            id="shopName"
+            type="text"
+            placeholder="ABC General Store"
+            invalid={!!errors.shopName}
+            disabled={isSubmitting}
+            {...register("shopName")}
           />
-          {errors.role && (
-            <p className="text-xs text-destructive">{errors.role.message}</p>
+          {errors.shopName && (
+            <p className="text-xs text-destructive">{errors.shopName.message}</p>
           )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="address">Shop Address</Label>
+          <Input
+            id="address"
+            type="text"
+            placeholder="Shop number, street, city"
+            invalid={!!errors.address}
+            disabled={isSubmitting}
+            {...register("address")}
+          />
+          {errors.address && (
+            <p className="text-xs text-destructive">{errors.address.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="role">Role</Label>
+          <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted/40 px-3 text-sm font-medium">
+            Shopkeeper
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Public registration creates a Shopkeeper account. Staff accounts
+            (Owner, Manager, Salesman, Delivery Boy) are created by an
+            administrator after login.
+          </p>
         </div>
 
         <div className="space-y-2">

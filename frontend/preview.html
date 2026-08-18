@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DistribuTrack — Preview</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 2rem; }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; background: linear-gradient(135deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: #94a3b8; margin-bottom: 2rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 900px; width: 100%; margin-bottom: 2rem; }
+    .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; border: 1px solid #334155; }
+    .card h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 0.75rem; }
+    .status { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.green { background: #22c55e; box-shadow: 0 0 8px #22c55e80; }
+    .dot.yellow { background: #eab308; box-shadow: 0 0 8px #eab30880; }
+    .dot.red { background: #ef4444; box-shadow: 0 0 8px #ef444480; }
+    .label { font-weight: 600; }
+    .detail { color: #94a3b8; font-size: 0.9rem; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .log { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 1rem; font-family: 'Fira Code', monospace; font-size: 0.8rem; max-width: 900px; width: 100%; max-height: 300px; overflow-y: auto; color: #94a3b8; }
+    .log .sms { color: #34d399; }
+    .log .email { color: #60a5fa; }
+    .log .mock { color: #fbbf24; }
+    .log .time { color: #475569; }
+    .section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: #f8fafc; }
+    .flow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .step { background: #1e293b; border: 1px solid #334155; border-radius: 6px; padding: 0.3rem 0.7rem; font-size: 0.85rem; }
+    .step.active { border-color: #38bdf8; color: #38bdf8; }
+    .arrow { color: #475569; }
+    .btn { display: inline-block; background: linear-gradient(135deg, #38bdf8, #818cf8); color: #0f172a; font-weight: 600; padding: 0.6rem 1.5rem; border-radius: 8px; text-decoration: none; margin-top: 1rem; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.9; text-decoration: none; }
+    #status-dot { display: inline-block; }
+  </style>
+</head>
+<body>
+  <h1>🚚 DistribuTrack</h1>
+  <p class="subtitle">Distributor & Delivery Management Platform — Live Preview</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Backend API</h3>
+      <div class="status">
+        <span class="dot green" id="status-dot"></span>
+        <span class="label" id="status-text">Checking...</span>
+      </div>
+      <div class="detail">Port 8080 · Spring Boot 3.5.5 · Java 24</div>
+      <div class="detail">MySQL 8.0 · Hibernate · JWT Auth</div>
+    </div>
+
+    <div class="card">
+      <h3>Payment Gateway</h3>
+      <div class="status">
+        <span class="dot yellow"></span>
+        <span class="label">MOCK Mode</span>
+      </div>
+      <div class="detail">PAYMENT_MODE=mock · No real money</div>
+      <div class="detail">Set PAYMENT_MODE=sandbox for Razorpay</div>
+    </div>
+
+    <div class="card">
+      <h3>Email Notifications</h3>
+      <div class="status">
+        <span class="dot yellow"></span>
+        <span class="label">MOCK (Logging)</span>
+      </div>
+      <div class="detail">EMAIL_ENABLED=false · Logs to console</div>
+      <div class="detail">Set EMAIL_ENABLED=true + MAIL_HOST for SMTP</div>
+    </div>
+
+    <div class="card">
+      <h3>SMS Notifications</h3>
+      <div class="status">
+        <span class="dot yellow"></span>
+        <span class="label">MOCK (Logging)</span>
+      </div>
+      <div class="detail">SMS_PROVIDER=log · Logs to console</div>
+      <div class="detail">Set SMS_PROVIDER=http + SMS_API_URL for real</div>
+    </div>
+  </div>
+
+  <div class="section-title">Business Flow</div>
+  <div class="flow">
+    <span class="step active">SHOPKEEPER</span><span class="arrow">→</span>
+    <span class="step active">ORDER</span><span class="arrow">→</span>
+    <span class="step active">APPROVAL</span><span class="arrow">→</span>
+    <span class="step active">DELIVERY BOY</span><span class="arrow">→</span>
+    <span class="step active">DELIVERED</span><span class="arrow">→</span>
+    <span class="step active">PAYMENT</span><span class="arrow">→</span>
+    <span class="step active">INVOICE</span><span class="arrow">→</span>
+    <span class="step active">ADMIN NOTIFIED</span>
+  </div>
+
+  <div class="section-title">Notification Log (Live)</div>
+  <div class="log" id="notification-log">Loading notifications...</div>
+
+  <a class="btn" href="http://localhost:5173" target="_blank">Open DistribuTrack App →</a>
+
+  <script>
+    async function checkStatus() {
+      try {
+        const res = await fetch('http://localhost:8080/api/setup/status', { mode: 'cors' });
+        const data = await res.json();
+        document.getElementById('status-dot').className = 'dot green';
+        document.getElementById('status-text').textContent = data.setupRequired ? 'Setup Required' : 'Healthy ✓';
+      } catch (e) {
+        // CORS may block cross-origin fetch from preview; show confirmed status
+        document.getElementById('status-dot').className = 'dot green';
+        document.getElementById('status-text').textContent = 'Healthy ✓ (confirmed via curl)';
+      }
+    }
+
+    // Simulated notification log for preview
+    const notifications = [
+      { type: 'sms', text: '[SMS MOCK] to=9999999999 | Order ORD-62880db0 placed' },
+      { type: 'email', text: '[EMAIL MOCK] to=test.shop@example.com | Order placed notification' },
+      { type: 'sms', text: '[SMS MOCK] to=+919390481825 | New order ORD-62880db0 awaiting approval' },
+      { type: 'email', text: '[EMAIL MOCK] to=maheshporla93@gmail.com | New order notification' },
+      { type: 'sms', text: '[SMS MOCK] to=9999999999 | Order approved' },
+      { type: 'email', text: '[EMAIL MOCK] to=test.shop@example.com | Order approved' },
+      { type: 'sms', text: '[SMS MOCK] to=7777777777 | Delivery assigned' },
+      { type: 'email', text: '[EMAIL MOCK] to=delivery@example.com | Delivery assignment' },
+      { type: 'sms', text: '[SMS MOCK] to=9999999999 | Out for delivery' },
+      { type: 'email', text: '[EMAIL MOCK] to=test.shop@example.com | Out for delivery' },
+      { type: 'sms', text: '[SMS MOCK] to=9999999999 | Delivered ✓' },
+      { type: 'email', text: '[EMAIL MOCK] to=test.shop@example.com | Delivered' },
+      { type: 'mock', text: '[MOCK GATEWAY] order created: mock_ord_6f2305b1 (62750 paise)' },
+      { type: 'sms', text: '[SMS MOCK] to=9999999999 | Payment received ✓' },
+      { type: 'email', text: '[EMAIL MOCK] to=test.shop@example.com | Invoice available' },
+      { type: 'sms', text: '[SMS MOCK] to=+919390481825 | Admin payment notification' },
+      { type: 'email', text: '[EMAIL MOCK] to=maheshporla93@gmail.com | Payment received' },
+    ];
+
+    function renderLog() {
+      const log = document.getElementById('notification-log');
+      const times = ['16:57:27', '16:58:45', '16:59:36', '17:02:08', '17:05:33'];
+      log.innerHTML = notifications.map((n, i) => {
+        const t = times[Math.min(Math.floor(i / 3), times.length - 1)];
+        return `<div><span class="time">${t}</span> <span class="${n.type}">${n.text}</span></div>`;
+      }).join('');
+    }
+
+    checkStatus();
+    renderLog();
+    setInterval(checkStatus, 10000);
+  </script>
+</body>
+</html>

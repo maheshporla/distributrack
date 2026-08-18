@@ -223,3 +223,23 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Print: when printing an invoice, hide the app chrome (sidebar + navbar)
+ * and any element marked .print-hide, leaving only the invoice document.
+ * ------------------------------------------------------------------------ */
+@media print {
+  aside,
+  header,
+  .print-hide {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  main > div {
+    max-width: none !important;
+  }
+}

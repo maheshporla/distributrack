@@ -6,9 +6,25 @@ export const ROUTES = {
   // Public / auth
   LOGIN: "/login",
   REGISTER: "/register",
+  FORGOT_PASSWORD: "/forgot-password",
+  RESET_PASSWORD: "/reset-password",
+  /** One-time first-administrator bootstrap (only while the system has no users). */
+  SETUP_FIRST_ADMIN: "/setup/first-admin",
   UNAUTHORIZED: "/unauthorized",
 
-  // Dashboard (protected)
+  // Shopkeeper portal (separate from admin)
+  SHOPKEEPER_LOGIN: "/shopkeeper/login",
+  SHOPKEEPER_REGISTER: "/shopkeeper/register",
+  SHOPKEEPER_DASHBOARD: "/shopkeeper/dashboard",
+  SHOPKEEPER_PRODUCTS: "/shopkeeper/products",
+  SHOPKEEPER_ORDERS: "/shopkeeper/orders",
+  SHOPKEEPER_DELIVERIES: "/shopkeeper/deliveries",
+  SHOPKEEPER_INVOICES: "/shopkeeper/invoices",
+  SHOPKEEPER_PAYMENTS: "/shopkeeper/payments",
+  SHOPKEEPER_NOTIFICATIONS: "/shopkeeper/notifications",
+  SHOPKEEPER_SETTINGS: "/shopkeeper/settings",
+
+  // Admin / staff portal
   DASHBOARD: "/dashboard",
   PRODUCTS: "/products",
   INVENTORY: "/inventory",
@@ -17,6 +33,7 @@ export const ROUTES = {
   ORDERS: "/orders",
   DELIVERY_WORKERS: "/delivery-workers",
   DELIVERIES: "/deliveries",
+  USERS: "/users",
   INVOICES: "/invoices",
   PAYMENTS: "/payments",
   ANALYTICS: "/analytics",
