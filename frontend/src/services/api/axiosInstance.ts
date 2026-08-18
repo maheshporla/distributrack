@@ -3,10 +3,11 @@ import { STORAGE_KEYS } from "@/constants/app.constants";
 import { ROUTES } from "@/constants/routes.constants";
 import { useAuthStore } from "@/store/authStore";
 import type { ApiError } from "@/types/common.types";
+import { env } from "@/config/env";
 
 export const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-  timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 15000,
+  baseURL: env.apiBaseUrl,
+  timeout: env.apiTimeout,
   headers: {
     "Content-Type": "application/json",
   },
@@ -42,9 +43,16 @@ axiosInstance.interceptors.response.use(
     if (error.response?.status === 401) {
       useAuthStore.getState().clearSession();
 
-      // Avoid redirect loop on login page.
-      if (window.location.pathname !== ROUTES.LOGIN) {
-        window.location.assign(ROUTES.LOGIN);
+      // Determine redirect path (Shopkeeper login vs. Admin/Staff login)
+      const isShopkeeperPath = window.location.pathname.startsWith("/shopkeeper");
+      const loginRoute = isShopkeeperPath ? ROUTES.SHOPKEEPER_LOGIN : ROUTES.LOGIN;
+
+      // Avoid redirect loop if we are already on either login page
+      if (
+        window.location.pathname !== ROUTES.LOGIN &&
+        window.location.pathname !== ROUTES.SHOPKEEPER_LOGIN
+      ) {
+        window.location.assign(loginRoute);
       }
     }
 
