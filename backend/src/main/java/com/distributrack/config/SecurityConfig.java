@@ -276,7 +276,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(List.of(
-                "https://distributrack.vercel.app"
+                "https://distributrack.vercel.app",
+                "https://distributrack-mzmfv6unm-maheshporla93-4929s-projects.vercel.app"
         ));
 
         configuration.setAllowedMethods(List.of(
