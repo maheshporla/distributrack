@@ -13,15 +13,6 @@ import java.util.List;
 @Configuration
 public class CorsConfig {
 
-    /**
-     * Comma-separated allowed origins.
-     *
-     * Production:
-     * Set CORS_ALLOWED_ORIGINS in Railway variables.
-     *
-     * Local development:
-     * localhost Vite ports are included as defaults.
-     */
     @Value("${app.cors.allowed-origins:http://localhost:5173,http://localhost:5174,http://localhost:5177,https://distributrack.vercel.app}")
     private String allowedOrigins;
 
@@ -48,19 +39,14 @@ public class CorsConfig {
                 )
         );
 
-        configuration.setAllowedHeaders(
-                List.of("*")
-        );
+        configuration.setAllowedHeaders(List.of("*"));
 
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration(
-                "/**",
-                configuration
-        );
+        source.registerCorsConfiguration("/**", configuration);
 
         return source;
     }
