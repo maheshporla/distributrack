@@ -30,7 +30,10 @@ function readBoolean(key: keyof ImportMetaEnv, fallback = false): boolean {
 }
 
 export const env = {
-  apiBaseUrl: readString("VITE_API_BASE_URL", "http://localhost:8080/api"),
+  apiBaseUrl: (() => {
+    const url = readString("VITE_API_BASE_URL", "http://localhost:8080/api");
+    return url.endsWith("/api") ? url : `${url}/api`;
+  })(),
   apiTimeout: readNumber("VITE_API_TIMEOUT", 15000),
   appName: readString("VITE_APP_NAME", "DistribuTrack"),
   appEnv: readString("VITE_APP_ENV", "development") as
