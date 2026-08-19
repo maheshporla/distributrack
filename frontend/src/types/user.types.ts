@@ -25,6 +25,8 @@ export interface CreateUserPayload {
   password: string;
   phone: string;
   role: RoleName;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
 }
 
 /** Matches UpdateUserRequest.java (password is optional — omit to keep current). */
@@ -34,4 +36,6 @@ export interface UpdateUserPayload {
   role: RoleName;
   enabled: boolean;
   password?: string;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
 }

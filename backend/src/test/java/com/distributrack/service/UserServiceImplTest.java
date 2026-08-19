@@ -10,6 +10,8 @@ import com.distributrack.repository.RoleRepository;
 import com.distributrack.repository.UserRepository;
 import com.distributrack.security.CurrentUserService;
 import com.distributrack.service.impl.UserServiceImpl;
+import com.distributrack.repository.PasswordResetTokenRepository;
+import com.distributrack.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,9 +29,12 @@ class UserServiceImplTest {
     private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
     private final CurrentUserService currentUserService = mock(CurrentUserService.class);
     private final AuditService auditService = mock(AuditService.class);
+    private final PasswordResetTokenRepository passwordResetTokenRepository = mock(PasswordResetTokenRepository.class);
+    private final NotificationService notificationService = mock(NotificationService.class);
 
     private final UserServiceImpl userService = new UserServiceImpl(
-            userRepository, roleRepository, passwordEncoder, currentUserService, auditService
+            userRepository, roleRepository, passwordEncoder, currentUserService, auditService,
+            passwordResetTokenRepository, notificationService
     );
 
     private User admin;

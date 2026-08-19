@@ -245,6 +245,7 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(
                 passwordEncoder.encode(request.getNewPassword())
         );
+        user.setEnabled(true);
 
         userRepository.save(user);
 
@@ -265,6 +266,8 @@ public class AuthServiceImpl implements AuthService {
                 .address(user.getAddress())
                 .role(user.getRole().getName())
                 .enabled(user.getEnabled())
+                .emailNotificationsEnabled(user.getEmailNotificationsEnabled())
+                .smsNotificationsEnabled(user.getSmsNotificationsEnabled())
                 .createdAt(user.getCreatedAt())
                 .build();
     }
@@ -288,6 +291,12 @@ public class AuthServiceImpl implements AuthService {
         user.setPhone(newPhone);
         user.setShopName(trimToNull(request.getShopName()));
         user.setAddress(trimToNull(request.getAddress()));
+        if (request.getEmailNotificationsEnabled() != null) {
+            user.setEmailNotificationsEnabled(request.getEmailNotificationsEnabled());
+        }
+        if (request.getSmsNotificationsEnabled() != null) {
+            user.setSmsNotificationsEnabled(request.getSmsNotificationsEnabled());
+        }
 
         User savedUser = userRepository.save(user);
 
@@ -300,6 +309,8 @@ public class AuthServiceImpl implements AuthService {
                 .address(savedUser.getAddress())
                 .role(savedUser.getRole().getName())
                 .enabled(savedUser.getEnabled())
+                .emailNotificationsEnabled(savedUser.getEmailNotificationsEnabled())
+                .smsNotificationsEnabled(savedUser.getSmsNotificationsEnabled())
                 .createdAt(savedUser.getCreatedAt())
                 .build();
     }

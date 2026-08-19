@@ -54,9 +54,23 @@ public class User implements UserDetails {
     @Builder.Default
     private Boolean enabled = true;
 
+    @Column(name = "email_notifications_enabled", nullable = false)
+    @Builder.Default
+    private Boolean emailNotificationsEnabled = true;
+
+    @Column(name = "sms_notifications_enabled", nullable = false)
+    @Builder.Default
+    private Boolean smsNotificationsEnabled = true;
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private PasswordResetToken passwordResetToken;
+
+    @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Notification> notifications;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

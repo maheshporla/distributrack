@@ -9,12 +9,18 @@ import com.distributrack.enums.RoleName;
 import com.distributrack.repository.RoleRepository;
 import com.distributrack.repository.UserRepository;
 import com.distributrack.security.CurrentUserService;
+import com.distributrack.entity.PasswordResetToken;
+import com.distributrack.repository.PasswordResetTokenRepository;
 import com.distributrack.service.AuditService;
+import com.distributrack.service.NotificationService;
 import com.distributrack.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 import java.util.List;
 
@@ -28,6 +34,8 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final CurrentUserService currentUserService;
     private final AuditService auditService;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final NotificationService notificationService;
 
     // ------------------------------------------------------------------
     // Role matrix — who may create/manage which roles.
@@ -131,6 +139,11 @@ public class UserServiceImpl implements UserService {
         Role role = roleRepository.findByName(request.getRole())
                 .orElseThrow(() -> new RuntimeException("Role not found: " + request.getRole()));
 
+        boolean isStaff = request.getRole() == RoleName.DELIVERY_BOY 
+                || request.getRole() == RoleName.SALESMAN 
+                || request.getRole() == RoleName.MANAGER 
+                || request.getRole() == RoleName.OWNER;
+
         User user = User.builder()
                 .fullName(request.getFullName().trim())
                 .email(request.getEmail().trim())
@@ -138,11 +151,25 @@ public class UserServiceImpl implements UserService {
                 .phone(request.getPhone().trim())
                 .shopName(trimToNull(request.getShopName()))
                 .address(trimToNull(request.getAddress()))
-                .enabled(true)
+                .enabled(!isStaff) // Staff are created disabled, active only after setting password
                 .role(role)
+                .emailNotificationsEnabled(request.getEmailNotificationsEnabled() != null ? request.getEmailNotificationsEnabled() : true)
+                .smsNotificationsEnabled(request.getSmsNotificationsEnabled() != null ? request.getSmsNotificationsEnabled() : true)
                 .build();
 
         user = userRepository.save(user);
+
+        if (isStaff) {
+            String token = UUID.randomUUID().toString();
+            PasswordResetToken resetToken = PasswordResetToken.builder()
+                    .token(token)
+                    .user(user)
+                    .expiryDate(LocalDateTime.now().plusDays(7)) // 7 days activation window
+                    .build();
+            passwordResetTokenRepository.save(resetToken);
+
+            notificationService.notifyWorkerCreated(user, token);
+        }
 
         auditService.log("USER_CREATE", "User", user.getId(),
                 request.getRole() + " account created: " + user.getEmail()
@@ -202,6 +229,12 @@ public class UserServiceImpl implements UserService {
         user.setAddress(trimToNull(request.getAddress()));
         user.setRole(role);
         user.setEnabled(request.getEnabled());
+        if (request.getEmailNotificationsEnabled() != null) {
+            user.setEmailNotificationsEnabled(request.getEmailNotificationsEnabled());
+        }
+        if (request.getSmsNotificationsEnabled() != null) {
+            user.setSmsNotificationsEnabled(request.getSmsNotificationsEnabled());
+        }
 
         // Optional admin password reset — only applied when a non-blank
         // password was sent. Always BCrypt-encoded, never stored raw.
@@ -260,6 +293,8 @@ public class UserServiceImpl implements UserService {
                 .address(user.getAddress())
                 .role(user.getRole().getName())
                 .enabled(user.getEnabled())
+                .emailNotificationsEnabled(user.getEmailNotificationsEnabled())
+                .smsNotificationsEnabled(user.getSmsNotificationsEnabled())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

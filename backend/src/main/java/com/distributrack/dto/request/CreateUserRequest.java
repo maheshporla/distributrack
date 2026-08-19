@@ -44,4 +44,8 @@ public class CreateUserRequest {
      */
     @NotNull(message = "Role is required")
     private RoleName role;
+
+    private Boolean emailNotificationsEnabled;
+
+    private Boolean smsNotificationsEnabled;
 }

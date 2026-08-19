@@ -30,5 +30,9 @@ public class UserResponse {
 
     private Boolean enabled;
 
+    private Boolean emailNotificationsEnabled;
+
+    private Boolean smsNotificationsEnabled;
+
     private LocalDateTime createdAt;
 }

@@ -18,6 +18,7 @@ import com.distributrack.security.CurrentUserService;
 import com.distributrack.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +46,9 @@ public class NotificationServiceImpl implements NotificationService {
     private final InventoryRepository inventoryRepository;
     private final CurrentUserService currentUserService;
     private final NotificationEventPublisher notificationEventPublisher;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     // =========================================================
     // Query / mutate own notifications
@@ -304,6 +308,17 @@ public class NotificationServiceImpl implements NotificationService {
         });
     }
 
+    @Override
+    public void notifyWorkerCreated(User worker, String activationToken) {
+        safely(() -> {
+            String activationLink = frontendUrl + "/reset-password?token=" + activationToken;
+            save(worker, NotificationType.WORKER_CREATED,
+                    "Your DistribuTrack Worker Account",
+                    "Your DistribuTrack worker account has been created. Please use this link to set your password and activate your account: " + activationLink,
+                    null, null);
+        });
+    }
+
     // =========================================================
     // Helpers
     // =========================================================
@@ -331,11 +346,15 @@ public class NotificationServiceImpl implements NotificationService {
 
         notificationRepository.save(notification);
 
+        boolean emailEnabledForUser = Boolean.TRUE.equals(recipient.getEmailNotificationsEnabled());
+        boolean smsEnabledForUser = Boolean.TRUE.equals(recipient.getSmsNotificationsEnabled());
+
         // Fan the event out to the out-of-band channels (email + SMS).
         // The async listener isolates provider failures from this flow.
         notificationEventPublisher.publish(new NotificationDeliveryEvent(
-                recipient.getEmail(),
-                recipient.getPhone(),
+                emailEnabledForUser ? recipient.getEmail() : null,
+                smsEnabledForUser ? recipient.getPhone() : null,
+                recipient.getFullName(),
                 type,
                 title,
                 message

@@ -26,4 +26,8 @@ public class UpdateProfileRequest {
     /** B2B: shop address. Optional. */
     @Size(max = 255, message = "Address cannot exceed 255 characters")
     private String address;
+
+    private Boolean emailNotificationsEnabled;
+
+    private Boolean smsNotificationsEnabled;
 }

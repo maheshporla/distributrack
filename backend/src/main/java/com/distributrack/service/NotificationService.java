@@ -4,6 +4,7 @@ import com.distributrack.dto.response.NotificationResponse;
 import com.distributrack.entity.Delivery;
 import com.distributrack.entity.Order;
 import com.distributrack.entity.Payment;
+import com.distributrack.entity.User;
 
 import java.util.List;
 
@@ -67,4 +68,6 @@ public interface NotificationService {
      * create unlimited duplicate notifications per inventory record.
      */
     void checkLowStockAndNotify();
+
+    void notifyWorkerCreated(User worker, String activationToken);
 }

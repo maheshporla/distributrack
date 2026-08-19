@@ -85,6 +85,8 @@ export interface UserProfile {
   address?: string | null;
   role: RoleName;
   enabled: boolean;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
   createdAt: string;
 }
 

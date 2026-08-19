@@ -27,6 +27,8 @@ export function SettingsPage() {
   // Profile Form state
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(true);
+  const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(true);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
 
   // Password Form state
@@ -43,6 +45,8 @@ export function SettingsPage() {
       setProfile(data);
       setFullName(data.fullName);
       setPhone(data.phone);
+      setEmailNotificationsEnabled(data.emailNotificationsEnabled ?? true);
+      setSmsNotificationsEnabled(data.smsNotificationsEnabled ?? true);
     } catch (error) {
       console.error(error);
       toast.error("Failed to load user profile information.");
@@ -68,6 +72,8 @@ export function SettingsPage() {
       const updated = await authService.updateProfile({
         fullName: fullName.trim(),
         phone: phone.trim(),
+        emailNotificationsEnabled,
+        smsNotificationsEnabled,
       });
       setProfile(updated);
       updateStoreUser({ fullName: updated.fullName });
@@ -270,6 +276,38 @@ export function SettingsPage() {
                       <p className="text-xs text-muted-foreground mt-1">
                         Your role determines your system clearance level.
                       </p>
+                    </div>
+                  </div>
+
+                  <div className="border-t pt-4 space-y-4">
+                    <h5 className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+                      Notification Preferences
+                    </h5>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <input
+                          id="settings-emailNotif"
+                          type="checkbox"
+                          checked={emailNotificationsEnabled}
+                          onChange={(e) => setEmailNotificationsEnabled(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <label htmlFor="settings-emailNotif" className="text-sm font-medium text-foreground cursor-pointer">
+                          Enable Email Notifications
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <input
+                          id="settings-smsNotif"
+                          type="checkbox"
+                          checked={smsNotificationsEnabled}
+                          onChange={(e) => setSmsNotificationsEnabled(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <label htmlFor="settings-smsNotif" className="text-sm font-medium text-foreground cursor-pointer">
+                          Enable SMS Notifications
+                        </label>
+                      </div>
                     </div>
                   </div>
 

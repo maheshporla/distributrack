@@ -27,5 +27,8 @@ public enum NotificationType {
     INVOICE_AVAILABLE,
 
     // Inventory
-    LOW_STOCK
+    LOW_STOCK,
+
+    // Administration
+    WORKER_CREATED
 }

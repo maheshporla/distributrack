@@ -112,6 +112,20 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Resend SDK for production email delivery -->
+        <dependency>
+            <groupId>com.resend</groupId>
+            <artifactId>resend-java</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+
+        <!-- Twilio SDK for production SMS delivery -->
+        <dependency>
+            <groupId>com.twilio.sdk</groupId>
+            <artifactId>twilio</artifactId>
+            <version>12.1.1</version>
+        </dependency>
+
     </dependencies>
 
     <build>

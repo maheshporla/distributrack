@@ -18,6 +18,8 @@ public class NotificationDeliveryEvent {
 
     private final String recipientPhone;
 
+    private final String recipientName;
+
     private final NotificationType type;
 
     private final String title;

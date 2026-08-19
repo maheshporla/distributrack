@@ -1,5 +1,7 @@
 package com.distributrack.notification;
 
+import com.resend.Resend;
+import com.resend.services.emails.model.CreateEmailOptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -11,18 +13,6 @@ import org.springframework.stereotype.Service;
 
 import jakarta.mail.internet.MimeMessage;
 
-/**
- * Email delivery via JavaMailSender (spring-boot-starter-mail).
- *
- * Configuration is environment-driven:
- *   EMAIL_ENABLED (default false), MAIL_HOST, MAIL_PORT, MAIL_USERNAME,
- *   MAIL_PASSWORD, EMAIL_FROM.
- *
- * When email is disabled or the SMTP host is not configured, messages
- * are logged as [EMAIL MOCK] — development never depends on a real SMTP
- * server, and production enables real delivery purely via environment
- * variables.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -36,19 +26,59 @@ public class EmailServiceImpl implements EmailService {
     @Value("${app.notifications.email.from:DistribuTrack <no-reply@distributrack.local>}")
     private String from;
 
+    @Value("${app.notifications.email.provider:smtp}")
+    private String provider;
+
+    @Value("${app.notifications.email.resend-api-key:}")
+    private String resendApiKey;
+
     @Override
     @Async("notificationExecutor")
     public void send(String to, String subject, String htmlBody) {
 
+        if (!enabled) {
+            log.info("[EMAIL MOCK] to={} | subject={} | body={}",
+                    to, subject, htmlBody.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim());
+            return;
+        }
+
+        if ("resend".equalsIgnoreCase(provider)) {
+            sendViaResend(to, subject, htmlBody);
+        } else {
+            sendViaSmtp(to, subject, htmlBody);
+        }
+    }
+
+    private void sendViaResend(String to, String subject, String htmlBody) {
+        if (resendApiKey == null || resendApiKey.isBlank()) {
+            log.warn("[EMAIL] provider is resend but RESEND_API_KEY is not set — falling back to mock logging");
+            log.info("[EMAIL MOCK] (Resend) to={} | subject={} | body={}",
+                    to, subject, htmlBody.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim());
+            return;
+        }
+
+        try {
+            Resend resend = new Resend(resendApiKey);
+            CreateEmailOptions params = CreateEmailOptions.builder()
+                    .from(from)
+                    .to(to)
+                    .subject(subject)
+                    .html(htmlBody)
+                    .build();
+
+            resend.emails().send(params);
+            log.info("[EMAIL] sent to {} via Resend", to);
+        } catch (Exception ex) {
+            log.warn("[EMAIL] failed to send to {} via Resend: {}", to, ex.getMessage());
+        }
+    }
+
+    private void sendViaSmtp(String to, String subject, String htmlBody) {
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
 
-        if (!enabled || mailSender == null) {
-            if (enabled && mailSender == null) {
-                // Enabled but no SMTP connection configured — surface this
-                // loudly instead of silently pretending email was sent.
-                log.warn("[EMAIL] enabled but no SMTP configured (set MAIL_HOST / "
-                        + "MAIL_USERNAME / MAIL_PASSWORD) — falling back to mock logging");
-            }
+        if (mailSender == null) {
+            log.warn("[EMAIL] enabled but no SMTP configured (set MAIL_HOST / "
+                    + "MAIL_USERNAME / MAIL_PASSWORD) — falling back to mock logging");
             log.info("[EMAIL MOCK] to={} | subject={} | body={}",
                     to, subject, htmlBody.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim());
             return;

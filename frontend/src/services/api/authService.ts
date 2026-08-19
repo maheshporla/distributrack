@@ -61,7 +61,12 @@ export const authService = {
     return response.data;
   },
 
-  async updateProfile(payload: { fullName: string; phone: string }): Promise<UserProfile> {
+  async updateProfile(payload: {
+    fullName: string;
+    phone: string;
+    emailNotificationsEnabled?: boolean;
+    smsNotificationsEnabled?: boolean;
+  }): Promise<UserProfile> {
     const response = await axiosInstance.put<UserProfile>(
       ENDPOINTS.AUTH.PROFILE,
       payload,
