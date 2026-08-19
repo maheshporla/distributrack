@@ -3,6 +3,7 @@ package com.distributrack.service;
 import com.distributrack.config.DistributorProperties;
 import com.distributrack.dto.request.PaymentInitiationRequest;
 import com.distributrack.dto.request.PaymentRequest;
+import com.distributrack.dto.request.UpiPaymentSubmitRequest;
 import com.distributrack.dto.request.VerifyPaymentRequest;
 import com.distributrack.dto.response.PaymentInitiationResponse;
 import com.distributrack.dto.response.PaymentResponse;
@@ -550,5 +551,216 @@ class PaymentServiceImplTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> paymentService.updatePaymentStatus(9L, "NOT_A_STATUS"));
+    }
+
+    // ---------------------------------------------------------
+    // UPI direct payment
+    // ---------------------------------------------------------
+
+    @Test
+    void submitUpiPaymentCreatesPendingVerificationRecord() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(shopkeeper);
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(deliveredOrder));
+        when(paymentRepository.findByOrderOrderByIdAsc(deliveredOrder)).thenReturn(List.of());
+        when(paymentRepository.existsByUtr("123456789012")).thenReturn(false);
+
+        UpiPaymentSubmitRequest request = UpiPaymentSubmitRequest.builder()
+                .orderId(5L)
+                .utr("123456789012")
+                .build();
+
+        PaymentResponse response = paymentService.submitUpiPayment(request);
+
+        assertEquals(PaymentStatus.PENDING_VERIFICATION, response.getPaymentStatus());
+        assertEquals(PaymentChannel.UPI, response.getPaymentChannel());
+        assertEquals("123456789012", response.getUtr());
+        assertNotNull(response.getTransactionId());
+        verify(notificationService).notifyUpiPaymentSubmitted(any(Payment.class));
+    }
+
+    @Test
+    void submitUpiPaymentRejectsDuplicateUtr() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(shopkeeper);
+        when(orderRepository.findById(5L)).thenReturn(Optional.of(deliveredOrder));
+        when(paymentRepository.findByOrderOrderByIdAsc(deliveredOrder)).thenReturn(List.of());
+        when(paymentRepository.existsByUtr("123456789012")).thenReturn(true);
+
+        UpiPaymentSubmitRequest request = UpiPaymentSubmitRequest.builder()
+                .orderId(5L)
+                .utr("123456789012")
+                .build();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> paymentService.submitUpiPayment(request));
+        verify(paymentRepository, never()).save(any(Payment.class));
+    }
+
+    @Test
+    void submitUpiPaymentRequiresShopkeeperRole() {
+
+        User admin = User.builder()
+                .id(3L)
+                .fullName("Admin")
+                .email("admin@test.com")
+                .phone("9000000002")
+                .role(new Role(1L, RoleName.SUPER_ADMIN))
+                .build();
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+
+        UpiPaymentSubmitRequest request = UpiPaymentSubmitRequest.builder()
+                .orderId(5L)
+                .utr("123456789012")
+                .build();
+
+        assertThrows(IllegalStateException.class,
+                () -> paymentService.submitUpiPayment(request));
+    }
+
+    // ---------------------------------------------------------
+    // Admin approval / rejection
+    // ---------------------------------------------------------
+
+    @Test
+    void approvePaymentSetsSuccessAndAudit() {
+
+        User admin = User.builder()
+                .id(3L)
+                .fullName("Admin")
+                .email("admin@test.com")
+                .phone("9000000002")
+                .role(new Role(1L, RoleName.SUPER_ADMIN))
+                .build();
+
+        Payment pendingPayment = Payment.builder()
+                .id(20L)
+                .order(deliveredOrder)
+                .amount(BigDecimal.valueOf(1000))
+                .paymentMethod("UPI")
+                .paymentStatus(PaymentStatus.PENDING_VERIFICATION)
+                .transactionId("UPI_ABC")
+                .paymentChannel(PaymentChannel.UPI)
+                .utr("123456789012")
+                .build();
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+        when(paymentRepository.findById(20L)).thenReturn(Optional.of(pendingPayment));
+        when(paymentRepository.findByOrderOrderByIdAsc(deliveredOrder)).thenReturn(List.of());
+
+        PaymentResponse response = paymentService.approvePayment(20L);
+
+        assertEquals(PaymentStatus.SUCCESS, response.getPaymentStatus());
+        assertEquals("Admin", response.getVerifiedByName());
+        verify(notificationService).notifyUpiPaymentApproved(any(Payment.class));
+        verify(orderRepository).save(deliveredOrder);
+    }
+
+    @Test
+    void approveRejectsNonPendingVerificationPayment() {
+
+        User admin = User.builder()
+                .id(3L)
+                .fullName("Admin")
+                .email("admin@test.com")
+                .phone("9000000002")
+                .role(new Role(1L, RoleName.SUPER_ADMIN))
+                .build();
+
+        Payment successPayment = paymentFor(shopkeeper, PaymentStatus.SUCCESS);
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+        when(paymentRepository.findById(9L)).thenReturn(Optional.of(successPayment));
+
+        assertThrows(IllegalStateException.class,
+                () -> paymentService.approvePayment(9L));
+    }
+
+    @Test
+    void rejectPaymentSetsRejectedWithReason() {
+
+        User admin = User.builder()
+                .id(3L)
+                .fullName("Admin")
+                .email("admin@test.com")
+                .phone("9000000002")
+                .role(new Role(1L, RoleName.SUPER_ADMIN))
+                .build();
+
+        Payment pendingPayment = Payment.builder()
+                .id(21L)
+                .order(deliveredOrder)
+                .amount(BigDecimal.valueOf(1000))
+                .paymentMethod("UPI")
+                .paymentStatus(PaymentStatus.PENDING_VERIFICATION)
+                .transactionId("UPI_DEF")
+                .paymentChannel(PaymentChannel.UPI)
+                .utr("987654321098")
+                .build();
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+        when(paymentRepository.findById(21L)).thenReturn(Optional.of(pendingPayment));
+
+        PaymentResponse response = paymentService.rejectPayment(21L, "UTR not found in bank statement");
+
+        assertEquals(PaymentStatus.REJECTED, response.getPaymentStatus());
+        assertEquals("UTR not found in bank statement", response.getRejectionReason());
+        assertEquals("Admin", response.getVerifiedByName());
+        verify(notificationService).notifyUpiPaymentRejected(any(Payment.class));
+    }
+
+    @Test
+    void rejectPaymentRequiresReason() {
+
+        User admin = User.builder()
+                .id(3L)
+                .fullName("Admin")
+                .email("admin@test.com")
+                .phone("9000000002")
+                .role(new Role(1L, RoleName.SUPER_ADMIN))
+                .build();
+
+        Payment pendingPayment = Payment.builder()
+                .id(22L)
+                .order(deliveredOrder)
+                .amount(BigDecimal.valueOf(500))
+                .paymentMethod("UPI")
+                .paymentStatus(PaymentStatus.PENDING_VERIFICATION)
+                .transactionId("UPI_GHI")
+                .paymentChannel(PaymentChannel.UPI)
+                .utr("111222333444")
+                .build();
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+        when(paymentRepository.findById(22L)).thenReturn(Optional.of(pendingPayment));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> paymentService.rejectPayment(22L, ""));
+    }
+
+    @Test
+    void getPendingVerificationPaymentsReturnsCorrectList() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(shopkeeper);
+        Payment pending = Payment.builder()
+                .id(30L)
+                .order(deliveredOrder)
+                .amount(BigDecimal.valueOf(500))
+                .paymentMethod("UPI")
+                .paymentStatus(PaymentStatus.PENDING_VERIFICATION)
+                .transactionId("UPI_JKL")
+                .paymentChannel(PaymentChannel.UPI)
+                .utr("555666777888")
+                .build();
+
+        when(paymentRepository.findByPaymentStatusOrderByPaymentDateDesc(PaymentStatus.PENDING_VERIFICATION))
+                .thenReturn(List.of(pending));
+
+        List<PaymentResponse> result = paymentService.getPendingVerificationPayments();
+
+        assertEquals(1, result.size());
+        assertEquals(PaymentStatus.PENDING_VERIFICATION, result.get(0).getPaymentStatus());
+        assertEquals("555666777888", result.get(0).getUtr());
     }
 }

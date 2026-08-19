@@ -111,16 +111,44 @@ export function PaymentsPage() {
     try {
       setUpdatingStatusId(selectedPayment.id);
 
-      const updated = await paymentService.updatePaymentStatus(
-        selectedPayment.id,
-        next,
-      );
+      let updated: Payment;
 
-      toast.success(
-        next === "SUCCESS"
-          ? "Payment marked as paid"
-          : `Payment marked as ${next.toLowerCase()}`,
-      );
+      // PENDING_VERIFICATION payments use the dedicated approve/reject endpoints
+      // which also handle rejection reason and audit trail.
+      if (
+        selectedPayment.paymentStatus === "PENDING_VERIFICATION" &&
+        (next === "SUCCESS" || next === "REJECTED")
+      ) {
+        if (next === "REJECTED") {
+          const reason = window.prompt("Rejection reason (required):")
+            ?? "";
+          if (!reason.trim()) {
+            toast.error("Rejection reason is required");
+            setUpdatingStatusId(null);
+            return;
+          }
+          updated = await paymentService.rejectPayment(
+            selectedPayment.id,
+            reason.trim(),
+          );
+          toast.success("Payment rejected");
+        } else {
+          updated = await paymentService.approvePayment(
+            selectedPayment.id,
+          );
+          toast.success("Payment approved and marked as paid");
+        }
+      } else {
+        updated = await paymentService.updatePaymentStatus(
+          selectedPayment.id,
+          next,
+        );
+        toast.success(
+          next === "SUCCESS"
+            ? "Payment marked as paid"
+            : `Payment marked as ${next.toLowerCase()}`,
+        );
+      }
 
       setPayments((prev) =>
         prev.map((payment) =>
@@ -355,7 +383,9 @@ export function PaymentsPage() {
                           {payment.orderNumber}
                         </span>
                         <p className="text-xs text-muted-foreground">
-                          Txn {payment.transactionId.slice(0, 8)}…
+                          {payment.utr
+                            ? `UTR: ${payment.utr}`
+                            : `Txn ${payment.transactionId.slice(0, 8)}…`}
                         </p>
                       </td>
 

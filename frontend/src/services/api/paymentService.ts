@@ -7,6 +7,7 @@ import type {
   PaymentStatus,
   PaymentSummary,
   UpiDetails,
+  UpiPaymentSubmitPayload,
   VerifyPaymentPayload,
 } from "@/types/payment.types";
 
@@ -109,15 +110,44 @@ export const paymentService = {
   },
 
   /**
-   * Shopkeeper confirms they paid via UPI. Creates a PENDING payment
-   * record — NOT auto-verified. Admin must approve.
+   * Shopkeeper submits UPI payment proof with UTR. Creates a
+   * PENDING_VERIFICATION payment — admin must verify.
    */
-  async initiateUpiPayment(
-    payload: PaymentInitiationPayload,
+  async submitUpiPayment(
+    payload: UpiPaymentSubmitPayload,
   ): Promise<Payment> {
     const response = await axiosInstance.post<Payment>(
       "/payments/upi-initiate",
       payload,
+    );
+    return response.data;
+  },
+
+  // =========================================================
+  // Admin verification
+  // =========================================================
+
+  /** Admin approves a PENDING_VERIFICATION UPI payment. */
+  async approvePayment(paymentId: number): Promise<Payment> {
+    const response = await axiosInstance.post<Payment>(
+      `/payments/${paymentId}/approve`,
+    );
+    return response.data;
+  },
+
+  /** Admin rejects a PENDING_VERIFICATION UPI payment with a reason. */
+  async rejectPayment(paymentId: number, reason: string): Promise<Payment> {
+    const response = await axiosInstance.post<Payment>(
+      `/payments/${paymentId}/reject`,
+      { reason },
+    );
+    return response.data;
+  },
+
+  /** Returns all PENDING_VERIFICATION payments (admin dashboard). */
+  async getPendingVerificationPayments(): Promise<Payment[]> {
+    const response = await axiosInstance.get<Payment[]>(
+      "/payments/pending-verification",
     );
     return response.data;
   },

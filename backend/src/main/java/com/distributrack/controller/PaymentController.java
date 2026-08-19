@@ -2,6 +2,7 @@ package com.distributrack.controller;
 
 import com.distributrack.dto.request.PaymentInitiationRequest;
 import com.distributrack.dto.request.PaymentRequest;
+import com.distributrack.dto.request.UpiPaymentSubmitRequest;
 import com.distributrack.dto.request.VerifyPaymentRequest;
 import com.distributrack.dto.response.PaymentInitiationResponse;
 import com.distributrack.dto.response.PaymentResponse;
@@ -151,14 +152,50 @@ public class PaymentController {
     }
 
     /**
-     * Shopkeeper confirms they have paid via UPI. Creates a PENDING
-     * payment record — NOT SUCCESS. The payment is verified manually
-     * by admin staff. The frontend cannot mark it as paid on its own.
+     * Shopkeeper submits UPI payment proof with UTR. Creates a
+     * PENDING_VERIFICATION payment — admin must verify before marking
+     * as SUCCESS. The frontend cannot mark it as paid on its own.
      */
     @PostMapping("/upi-initiate")
-    public PaymentResponse initiateUpiPayment(
-            @Valid @RequestBody PaymentInitiationRequest request) {
+    public PaymentResponse submitUpiPayment(
+            @Valid @RequestBody UpiPaymentSubmitRequest request) {
 
-        return paymentService.initiateUpiPayment(request);
+        return paymentService.submitUpiPayment(request);
+    }
+
+    // =========================================================
+    // Admin verification
+    // =========================================================
+
+    /**
+     * Admin approves a PENDING_VERIFICATION UPI payment.
+     * Only SA/OWNER/MANAGER roles.
+     */
+    @PostMapping("/{paymentId}/approve")
+    public PaymentResponse approvePayment(@PathVariable Long paymentId) {
+
+        return paymentService.approvePayment(paymentId);
+    }
+
+    /**
+     * Admin rejects a PENDING_VERIFICATION UPI payment with a reason.
+     * Only SA/OWNER/MANAGER roles.
+     */
+    @PostMapping("/{paymentId}/reject")
+    public PaymentResponse rejectPayment(
+            @PathVariable Long paymentId,
+            @RequestBody java.util.Map<String, String> body) {
+
+        String reason = body.getOrDefault("reason", "");
+        return paymentService.rejectPayment(paymentId, reason);
+    }
+
+    /**
+     * Returns all PENDING_VERIFICATION payments (admin dashboard).
+     */
+    @GetMapping("/pending-verification")
+    public List<PaymentResponse> getPendingVerificationPayments() {
+
+        return paymentService.getPendingVerificationPayments();
     }
 }

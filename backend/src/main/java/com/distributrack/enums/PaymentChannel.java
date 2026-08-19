@@ -17,5 +17,6 @@ package com.distributrack.enums;
 public enum PaymentChannel {
     MANUAL,
     GATEWAY,
-    MOCK
+    MOCK,
+    UPI
 }

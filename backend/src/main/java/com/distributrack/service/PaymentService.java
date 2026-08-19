@@ -2,6 +2,7 @@ package com.distributrack.service;
 
 import com.distributrack.dto.request.PaymentInitiationRequest;
 import com.distributrack.dto.request.PaymentRequest;
+import com.distributrack.dto.request.UpiPaymentSubmitRequest;
 import com.distributrack.dto.request.VerifyPaymentRequest;
 import com.distributrack.dto.response.PaymentInitiationResponse;
 import com.distributrack.dto.response.PaymentResponse;
@@ -77,8 +78,21 @@ public interface PaymentService {
     UpiDetailsResponse getUpiDetails(Long orderId);
 
     /**
-     * Creates a PENDING payment record for a UPI payment initiated by
-     * the shopkeeper. NOT auto-verified — admin must approve.
+     * Creates a PENDING_VERIFICATION payment record for a UPI payment
+     * submitted by the shopkeeper with a UTR. Admin must approve.
      */
-    PaymentResponse initiateUpiPayment(PaymentInitiationRequest request);
+    PaymentResponse submitUpiPayment(UpiPaymentSubmitRequest request);
+
+    // ---------------------------------------------------------
+    // Admin verification
+    // ---------------------------------------------------------
+
+    /** Admin approves a PENDING_VERIFICATION payment → SUCCESS. */
+    PaymentResponse approvePayment(Long paymentId);
+
+    /** Admin rejects a PENDING_VERIFICATION payment → REJECTED. */
+    PaymentResponse rejectPayment(Long paymentId, String reason);
+
+    /** Returns all PENDING_VERIFICATION payments (admin only). */
+    List<PaymentResponse> getPendingVerificationPayments();
 }

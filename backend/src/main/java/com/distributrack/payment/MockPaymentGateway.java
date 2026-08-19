@@ -35,6 +35,13 @@ public class MockPaymentGateway implements PaymentGateway {
 
     public MockPaymentGateway(PaymentProperties properties) {
         this.mockSecret = properties.getMockSecret();
+        if (mockSecret == null || mockSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "PAYMENT_MOCK_SECRET must not be empty when using mock payment mode. "
+                            + "Set it to a secure random string in your environment variables, "
+                            + "or switch to sandbox mode with valid Razorpay credentials."
+            );
+        }
     }
 
     @Override

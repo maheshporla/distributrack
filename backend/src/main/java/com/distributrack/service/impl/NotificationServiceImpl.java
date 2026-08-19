@@ -250,16 +250,70 @@ public class NotificationServiceImpl implements NotificationService {
                 "Payment failed for " + payment.getOrder().getOrderNumber(),
                 "The payment for your order could not be processed.",
                 payment.getOrder().getId(), null));
-    }
-
-    @Override
+    }    @Override
     public void notifyPaymentRefunded(Payment payment) {
-        safely(() -> save(payment.getOrder().getShopkeeper(),
-                NotificationType.PAYMENT_REFUNDED,
+        safely(() -> save(payment.getOrder().getShopkeeper(), NotificationType.PAYMENT_REFUNDED,
                 "Payment refunded for " + payment.getOrder().getOrderNumber(),
                 "A refund of " + formatAmount(payment.getAmount())
                         + " has been issued for your order.",
                 payment.getOrder().getId(), null));
+    }
+
+    // =========================================================
+    // UPI direct payment events
+    // =========================================================
+
+    @Override
+    public void notifyUpiPaymentSubmitted(Payment payment) {
+        safely(() -> {
+            // Notify admin/distributor roles that a UPI payment needs verification.
+            for (User businessUser : businessUsers()) {
+                save(businessUser, NotificationType.UPI_PAYMENT_SUBMITTED,
+                        "UPI payment verification required — " + payment.getOrder().getOrderNumber(),
+                        "UPI payment of " + formatAmount(payment.getAmount())
+                                + " submitted by " + payment.getOrder().getShopkeeper().getFullName()
+                                + " for order " + payment.getOrder().getOrderNumber()
+                                + ". UTR: " + payment.getUtr() + ".",
+                        payment.getOrder().getId(), null);
+            }
+        });
+    }
+
+    @Override
+    public void notifyUpiPaymentApproved(Payment payment) {
+        safely(() -> {
+            // Notify the shopkeeper that their payment was approved.
+            save(payment.getOrder().getShopkeeper(), NotificationType.UPI_PAYMENT_APPROVED,
+                    "Payment verified — " + payment.getOrder().getOrderNumber(),
+                    "Your UPI payment of " + formatAmount(payment.getAmount())
+                            + " for order " + payment.getOrder().getOrderNumber()
+                            + " has been verified successfully.",
+                    payment.getOrder().getId(), null);
+
+            // Also notify admin roles.
+            for (User businessUser : businessUsers()) {
+                save(businessUser, NotificationType.UPI_PAYMENT_APPROVED,
+                        "Payment approved — " + payment.getOrder().getOrderNumber(),
+                        "UPI payment of " + formatAmount(payment.getAmount())
+                                + " for order " + payment.getOrder().getOrderNumber()
+                                + " approved.",
+                        payment.getOrder().getId(), null);
+            }
+        });
+    }
+
+    @Override
+    public void notifyUpiPaymentRejected(Payment payment) {
+        safely(() -> {
+            // Notify the shopkeeper that their payment was rejected.
+            save(payment.getOrder().getShopkeeper(), NotificationType.UPI_PAYMENT_REJECTED,
+                    "Payment not verified — " + payment.getOrder().getOrderNumber(),
+                    "Your UPI payment of " + formatAmount(payment.getAmount())
+                            + " for order " + payment.getOrder().getOrderNumber()
+                            + " could not be verified. Reason: " + payment.getRejectionReason()
+                            + ". Please retry with a valid UTR.",
+                    payment.getOrder().getId(), null);
+        });
     }
 
     // =========================================================

@@ -189,6 +189,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/payments/initiate", "/api/payments/verify", "/api/payments/upi-initiate")
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER", "SHOPKEEPER")
 
+                        // Admin UPI verification: approve / reject payments.
+                        .requestMatchers(HttpMethod.POST, "/api/payments/*/approve", "/api/payments/*/reject")
+                        .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
+
+                        // Pending verification list: admin dashboard.
+                        .requestMatchers(HttpMethod.GET, "/api/payments/pending-verification")
+                        .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
+
                         // Manual recording + status changes: admin roles only
                         .requestMatchers("/api/payments/**")
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")

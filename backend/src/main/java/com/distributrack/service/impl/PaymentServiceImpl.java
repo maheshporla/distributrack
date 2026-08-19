@@ -3,6 +3,7 @@ package com.distributrack.service.impl;
 import com.distributrack.config.DistributorProperties;
 import com.distributrack.dto.request.PaymentInitiationRequest;
 import com.distributrack.dto.request.PaymentRequest;
+import com.distributrack.dto.request.UpiPaymentSubmitRequest;
 import com.distributrack.dto.request.VerifyPaymentRequest;
 import com.distributrack.dto.response.PaymentInitiationResponse;
 import com.distributrack.dto.response.PaymentResponse;
@@ -397,16 +398,14 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentResponse initiateUpiPayment(PaymentInitiationRequest request) {
+    public PaymentResponse submitUpiPayment(UpiPaymentSubmitRequest request) {
 
         User current = currentUserService.getCurrentUser();
 
-        // Only SHOPKEEPER may initiate a UPI payment. Admin staff verify
-        // UPI payments via PUT /status — they do not initiate them.
+        // Only SHOPKEEPER may submit a UPI payment.
         if (current.getRole().getName() != RoleName.SHOPKEEPER) {
             throw new IllegalStateException(
-                    "Only SHOPKEEPER accounts may initiate UPI payments. "
-                            + "Admin staff should verify payments via the Payments page."
+                    "Only SHOPKEEPER accounts may submit UPI payments."
             );
         }
 
@@ -421,32 +420,123 @@ public class PaymentServiceImpl implements PaymentService {
             throw new IllegalStateException("Order " + order.getOrderNumber() + " is already fully paid");
         }
 
-        if (request.getAmount().compareTo(outstanding) > 0) {
+        // Trim and validate the UTR.
+        String utr = request.getUtr().trim();
+        if (utr.length() < 6 || utr.length() > 32) {
+            throw new IllegalArgumentException("UTR must be between 6 and 32 characters");
+        }
+
+        // Prevent duplicate UTR submissions.
+        if (paymentRepository.existsByUtr(utr)) {
             throw new IllegalArgumentException(
-                    "Amount cannot exceed the outstanding amount of " + outstanding
+                    "This UTR has already been submitted. Each UTR can only be used once."
             );
         }
 
-        // Create a PENDING payment — NOT auto-verified. Admin must
-        // manually verify that the UPI transfer was received before
-        // marking it SUCCESS. The frontend cannot mark it as paid.
+        // Create a PENDING_VERIFICATION payment — NOT auto-verified.
+        // Admin must verify the UTR against the bank statement.
         Payment payment = Payment.builder()
                 .order(order)
-                .amount(request.getAmount())
+                .amount(outstanding)
                 .paymentMethod("UPI")
-                .paymentStatus(PaymentStatus.PENDING)
+                .paymentStatus(PaymentStatus.PENDING_VERIFICATION)
                 .transactionId("UPI_" + UUID.randomUUID().toString().substring(0, 12))
-                .paymentChannel(PaymentChannel.MANUAL)
-                .notes("UPI payment initiated by shopkeeper — pending admin verification")
+                .paymentChannel(PaymentChannel.UPI)
+                .utr(utr)
+                .notes("UPI payment submitted by shopkeeper — awaiting admin verification")
                 .build();
 
         payment = paymentRepository.save(payment);
 
-        auditService.log("UPI_INITIATE", "Payment", payment.getId(),
-                "UPI payment of " + payment.getAmount() + " initiated for order "
-                        + order.getOrderNumber() + " — pending verification");
+        auditService.log("UPI_SUBMIT", "Payment", payment.getId(),
+                "UPI payment of " + payment.getAmount() + " submitted for order "
+                        + order.getOrderNumber() + " (UTR: " + utr + ") — pending verification");
+
+        // Notify admin/distributor about the pending verification.
+        notificationService.notifyUpiPaymentSubmitted(payment);
 
         return mapToResponse(payment);
+    }
+
+    // =========================================================
+    // Admin verification (approve / reject)
+    // =========================================================
+
+    @Override
+    @Transactional
+    public PaymentResponse approvePayment(Long paymentId) {
+
+        User admin = currentUserService.getCurrentUser();
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found with id: " + paymentId));
+
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING_VERIFICATION) {
+            throw new IllegalStateException(
+                    "Only PENDING_VERIFICATION payments can be approved (current: "
+                            + payment.getPaymentStatus() + ")"
+            );
+        }
+
+        payment.setPaymentStatus(PaymentStatus.SUCCESS);
+        payment.setVerifiedBy(admin);
+        payment.setVerifiedAt(java.time.LocalDateTime.now());
+        payment = paymentRepository.save(payment);
+
+        // Keep the order lifecycle in sync.
+        maybeCompleteOrder(payment.getOrder(), paidAmount(payment.getOrder()).add(payment.getAmount()));
+
+        notificationService.notifyUpiPaymentApproved(payment);
+
+        auditService.log("UPI_APPROVE", "Payment", payment.getId(),
+                "UPI payment of " + payment.getAmount() + " approved by "
+                        + admin.getFullName() + " for order " + payment.getOrder().getOrderNumber());
+
+        return mapToResponse(payment);
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse rejectPayment(Long paymentId, String reason) {
+
+        User admin = currentUserService.getCurrentUser();
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Payment not found with id: " + paymentId));
+
+        if (payment.getPaymentStatus() != PaymentStatus.PENDING_VERIFICATION) {
+            throw new IllegalStateException(
+                    "Only PENDING_VERIFICATION payments can be rejected (current: "
+                            + payment.getPaymentStatus() + ")"
+            );
+        }
+
+        if (reason == null || reason.trim().isBlank()) {
+            throw new IllegalArgumentException("Rejection reason is required");
+        }
+
+        payment.setPaymentStatus(PaymentStatus.REJECTED);
+        payment.setRejectionReason(reason.trim());
+        payment.setVerifiedBy(admin);
+        payment.setVerifiedAt(java.time.LocalDateTime.now());
+        payment = paymentRepository.save(payment);
+
+        notificationService.notifyUpiPaymentRejected(payment);
+
+        auditService.log("UPI_REJECT", "Payment", payment.getId(),
+                "UPI payment of " + payment.getAmount() + " rejected by "
+                        + admin.getFullName() + " for order " + payment.getOrder().getOrderNumber()
+                        + " (reason: " + reason.trim() + ")");
+
+        return mapToResponse(payment);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaymentResponse> getPendingVerificationPayments() {
+        List<Payment> pending = paymentRepository
+                .findByPaymentStatusOrderByPaymentDateDesc(PaymentStatus.PENDING_VERIFICATION);
+        return pending.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     // =========================================================
@@ -760,6 +850,11 @@ public class PaymentServiceImpl implements PaymentService {
                 .paymentChannel(payment.getPaymentChannel() != null
                         ? payment.getPaymentChannel() : PaymentChannel.MANUAL)
                 .transactionId(payment.getTransactionId())
+                .utr(payment.getUtr())
+                .rejectionReason(payment.getRejectionReason())
+                .verifiedByName(payment.getVerifiedBy() != null
+                        ? payment.getVerifiedBy().getFullName() : null)
+                .verifiedAt(payment.getVerifiedAt())
                 .paymentDate(payment.getPaymentDate())
                 .build();
     }

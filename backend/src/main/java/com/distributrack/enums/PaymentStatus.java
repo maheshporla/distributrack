@@ -9,7 +9,9 @@ package com.distributrack.enums;
 public enum PaymentStatus {
 
     PENDING,
+    PENDING_VERIFICATION,
     SUCCESS,
     FAILED,
+    REJECTED,
     REFUNDED
 }

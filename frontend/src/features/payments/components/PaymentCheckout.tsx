@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 
 import { paymentService } from "@/services/api/paymentService";
 
+import { Input } from "@/components/ui/input";
+
 import type {
   Payment,
   PaymentInitiationResponse,
@@ -53,6 +55,8 @@ export function PaymentCheckout({
   const [upiDetails, setUpiDetails] = useState<UpiDetails | null>(null);
   const [upiQrDataUrl, setUpiQrDataUrl] = useState<string | null>(null);
   const [upiInitiating, setUpiInitiating] = useState(false);
+  const [utr, setUtr] = useState("");
+  const [upiSubmitted, setUpiSubmitted] = useState(false);
 
   // ---------------------------------------------------------
   // 1. Initiate the gateway order (nothing is recorded yet)
@@ -189,17 +193,21 @@ export function PaymentCheckout({
 
   const handleUpiPayment = async () => {
     if (!initiation) return;
+    const trimmedUtr = utr.trim();
+    if (!trimmedUtr) {
+      toast.error("Please enter the UTR / Transaction ID from your UPI payment");
+      return;
+    }
     try {
       setUpiInitiating(true);
-      await paymentService.initiateUpiPayment({
+      await paymentService.submitUpiPayment({
         orderId: initiation.orderId,
-        amount: initiation.amount,
+        utr: trimmedUtr,
       });
-      toast.success("UPI payment recorded — pending admin verification");
-      // Refresh the page so the admin can see the pending payment
-      window.location.reload();
+      setUpiSubmitted(true);
+      toast.success("Payment submitted — waiting for admin verification");
     } catch (err: any) {
-      toast.error(err?.message ?? "Failed to record UPI payment");
+      toast.error(err?.message ?? "Failed to submit UPI payment");
     } finally {
       setUpiInitiating(false);
     }
@@ -367,7 +375,21 @@ export function PaymentCheckout({
         {/* UPI path */}
         {!loading && !error && initiation && paymentMethod === "upi" && (
           <div className="space-y-4 pt-4">
-            {upiDetails ? (
+            {upiSubmitted ? (
+              <div className="space-y-4">
+                <div className="flex items-start gap-2 rounded-lg border border-green-400/40 bg-green-50 p-3 text-xs text-green-700 dark:border-green-400/30 dark:bg-green-950 dark:text-green-300">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    <strong>Payment submitted successfully.</strong><br />
+                    Waiting for admin verification. You will be notified once
+                    your payment is verified.
+                  </p>
+                </div>
+                <Button variant="outline" className="w-full" onClick={onClose}>
+                  Close
+                </Button>
+              </div>
+            ) : upiDetails ? (
               <>
                 <div className="rounded-lg border bg-muted/40 p-4">
                   <div className="flex justify-between text-sm">
@@ -406,30 +428,47 @@ export function PaymentCheckout({
                     <li>Open any UPI app (PhonePe, GPay, Paytm, etc.)</li>
                     <li>Scan the QR code or pay to <strong>{upiDetails.upiId}</strong></li>
                     <li>Pay exactly <strong>{formatINR(upiDetails.amount)}</strong></li>
-                    <li>After payment, click "I've Paid via UPI" below</li>
+                    <li>Note the UTR / Transaction ID from your UPI app</li>
+                    <li>Enter the UTR below and submit</li>
                   </ol>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="utr" className="text-sm font-medium">
+                    UTR / Transaction ID *
+                  </label>
+                  <Input
+                    id="utr"
+                    placeholder="e.g. 123456789012"
+                    value={utr}
+                    onChange={(e) => setUtr(e.target.value)}
+                    maxLength={32}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the 12-digit reference number from your UPI app.
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-2 rounded-lg border border-blue-400/40 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-400/30 dark:bg-blue-950 dark:text-blue-300">
                   <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
                   <p>
-                    Your payment will be verified by admin staff before being marked as received.
-                    This prevents fraudulent "I Paid" claims.
+                    Your payment will be verified by admin staff before being marked as
+                    received. This prevents fraudulent "I Paid" claims.
                   </p>
                 </div>
 
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700"
                   onClick={handleUpiPayment}
-                  disabled={upiInitiating}
+                  disabled={upiInitiating || !utr.trim()}
                 >
                   {upiInitiating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Recording…
+                      Submitting…
                     </>
                   ) : (
-                    "I've Paid via UPI"
+                    "Submit Payment for Verification"
                   )}
                 </Button>
               </>

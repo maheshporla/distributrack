@@ -26,6 +26,11 @@ public enum NotificationType {
     PAYMENT_REFUNDED,
     INVOICE_AVAILABLE,
 
+    // UPI direct payments
+    UPI_PAYMENT_SUBMITTED,
+    UPI_PAYMENT_APPROVED,
+    UPI_PAYMENT_REJECTED,
+
     // Inventory
     LOW_STOCK,
 

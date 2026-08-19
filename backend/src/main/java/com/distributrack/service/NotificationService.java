@@ -64,6 +64,15 @@ public interface NotificationService {
     void notifyPaymentRefunded(Payment payment);
 
     /**
+     * UPI direct payment events.
+     */
+    void notifyUpiPaymentSubmitted(Payment payment);
+
+    void notifyUpiPaymentApproved(Payment payment);
+
+    void notifyUpiPaymentRejected(Payment payment);
+
+    /**
      * Scheduled low-stock scan. Uses a dedupe key so repeated checks never
      * create unlimited duplicate notifications per inventory record.
      */

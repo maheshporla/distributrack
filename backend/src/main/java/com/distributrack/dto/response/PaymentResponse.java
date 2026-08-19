@@ -39,5 +39,17 @@ public class PaymentResponse {
 
     private String transactionId;
 
+    /** UTR (Unique Transaction Reference) from UPI payment. */
+    private String utr;
+
+    /** Reason when an admin rejects a UPI payment. */
+    private String rejectionReason;
+
+    /** Name of the admin who approved/rejected the payment. */
+    private String verifiedByName;
+
+    /** Timestamp when the admin approved/rejected the payment. */
+    private LocalDateTime verifiedAt;
+
     private LocalDateTime paymentDate;
 }

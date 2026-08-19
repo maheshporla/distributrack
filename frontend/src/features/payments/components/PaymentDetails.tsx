@@ -133,6 +133,42 @@ export function PaymentDetails({
             </p>
             <p className="mt-1 text-sm font-medium">{payment.orderNumber}</p>
           </div>
+
+          {payment.utr && (
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                UTR / Transaction Reference
+              </p>
+              <p className="mt-1 break-all font-mono text-sm">{payment.utr}</p>
+            </div>
+          )}
+
+          {payment.rejectionReason && (
+            <div className="sm:col-span-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-destructive">
+                Rejection Reason
+              </p>
+              <p className="mt-1 text-sm text-destructive">
+                {payment.rejectionReason}
+              </p>
+            </div>
+          )}
+
+          {payment.verifiedByName && (
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Verified By
+              </p>
+              <p className="mt-1 text-sm font-medium">
+                {payment.verifiedByName}
+              </p>
+              {payment.verifiedAt && (
+                <p className="text-xs text-muted-foreground">
+                  {formatDateTime(payment.verifiedAt)}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

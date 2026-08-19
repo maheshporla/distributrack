@@ -24,4 +24,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     /** Webhook routing: find the application order behind a gateway order. */
     Optional<Payment> findByRazorpayOrderId(String razorpayOrderId);
+
+    /** Duplicate UTR prevention: check if a UTR has already been submitted. */
+    boolean existsByUtr(String utr);
+
+    /** Find payments pending UPI verification, newest first. */
+    List<Payment> findByPaymentStatusOrderByPaymentDateDesc(PaymentStatus paymentStatus);
 }

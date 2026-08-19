@@ -28,14 +28,16 @@
 
 export const PAYMENT_STATUSES = [
   "PENDING",
+  "PENDING_VERIFICATION",
   "SUCCESS",
   "FAILED",
+  "REJECTED",
   "REFUNDED",
 ] as const;
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-export const PAYMENT_CHANNELS = ["MANUAL", "GATEWAY", "MOCK"] as const;
+export const PAYMENT_CHANNELS = ["MANUAL", "GATEWAY", "MOCK", "UPI"] as const;
 
 export type PaymentChannel = (typeof PAYMENT_CHANNELS)[number];
 
@@ -43,6 +45,7 @@ export const PAYMENT_CHANNEL_LABELS: Record<PaymentChannel, string> = {
   MANUAL: "Manual",
   GATEWAY: "Online (Razorpay)",
   MOCK: "Online (Test Gateway)",
+  UPI: "Direct UPI",
 };
 
 /** UPI payment details returned by GET /api/payments/upi-details. */
@@ -93,6 +96,14 @@ export interface Payment {
   paymentStatus: PaymentStatus;
   paymentChannel: PaymentChannel | null;
   transactionId: string;
+  /** UTR (Unique Transaction Reference) from UPI payment. */
+  utr: string | null;
+  /** Reason when an admin rejects a UPI payment. */
+  rejectionReason: string | null;
+  /** Name of the admin who approved/rejected the payment. */
+  verifiedByName: string | null;
+  /** Timestamp when the admin approved/rejected the payment. */
+  verifiedAt: string | null;
   paymentDate: string;
 }
 
@@ -120,6 +131,12 @@ export interface PaymentInitiationResponse {
   keyId: string | null;
   mockPaymentId: string | null;
   mockSignature: string | null;
+}
+
+/** Matches UpiPaymentSubmitRequest.java. */
+export interface UpiPaymentSubmitPayload {
+  orderId: number;
+  utr: string;
 }
 
 /** Matches VerifyPaymentRequest.java. */

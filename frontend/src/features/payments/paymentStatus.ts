@@ -3,12 +3,13 @@ import type { RoleName } from "@/types/auth.types";
 
 /**
  * Payment status display metadata + the status actions the Payments UI
- * may offer. Values mirror the backend PaymentStatus enum exactly
- * (PENDING, SUCCESS, FAILED, REFUNDED); arbitrary strings are impossible
- * — the backend parses the enum and rejects anything else.
+ * may offer. Values mirror the backend PaymentStatus enum exactly;
+ * arbitrary strings are impossible — the backend parses the enum and
+ * rejects anything else.
  *
  * Role gating matches SecurityConfig + PaymentServiceImpl:
  *   - SA/OWNER/MANAGER may update payment status (PUT /api/payments/**)
+ *   - SA/OWNER/MANAGER may approve/reject UPI payments
  *   - SHOPKEEPER/SALESMAN read-only; DELIVERY_BOY no access
  *
  * The backend remains authoritative — it re-validates every value.
@@ -19,8 +20,10 @@ export const PAYMENT_STATUS_META: Record<
   { label: string; badgeVariant: "success" | "warning" | "destructive" | "info" | "default" | "secondary" }
 > = {
   PENDING: { label: "Pending", badgeVariant: "warning" },
+  PENDING_VERIFICATION: { label: "Pending Verification", badgeVariant: "info" },
   SUCCESS: { label: "Paid", badgeVariant: "success" },
   FAILED: { label: "Failed", badgeVariant: "destructive" },
+  REJECTED: { label: "Rejected", badgeVariant: "destructive" },
   REFUNDED: { label: "Refunded", badgeVariant: "secondary" },
 };
 
@@ -39,11 +42,16 @@ export const PAYMENT_STATUS_ACTIONS: Record<
     { to: "SUCCESS", label: "Mark Paid", buttonVariant: "default" },
     { to: "FAILED", label: "Mark Failed", buttonVariant: "destructive" },
   ],
+  PENDING_VERIFICATION: [
+    { to: "SUCCESS", label: "Approve", buttonVariant: "default" },
+    { to: "REJECTED", label: "Reject", buttonVariant: "destructive" },
+  ],
   SUCCESS: [{ to: "REFUNDED", label: "Refund", buttonVariant: "outline" }],
   FAILED: [
     { to: "SUCCESS", label: "Mark Paid", buttonVariant: "default" },
     { to: "REFUNDED", label: "Refund", buttonVariant: "outline" },
   ],
+  REJECTED: [],
   REFUNDED: [],
 };
 
