@@ -57,6 +57,12 @@ public class DeliveryResponse {
 
     private String deliveryAddress;
 
+    /** Delivery destination latitude (copied from shopkeeper profile). */
+    private Double destinationLatitude;
+
+    /** Delivery destination longitude (copied from shopkeeper profile). */
+    private Double destinationLongitude;
+
     private String vehicleNumber;
 
     // Live GPS tracking

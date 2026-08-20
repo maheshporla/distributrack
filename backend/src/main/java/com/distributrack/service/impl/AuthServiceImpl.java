@@ -280,6 +280,8 @@ public class AuthServiceImpl implements AuthService {
                 .phone(user.getPhone())
                 .shopName(user.getShopName())
                 .address(user.getAddress())
+                .latitude(user.getLatitude())
+                .longitude(user.getLongitude())
                 .role(user.getRole().getName())
                 .enabled(user.getEnabled())
                 .emailNotificationsEnabled(user.getEmailNotificationsEnabled())
@@ -307,6 +309,9 @@ public class AuthServiceImpl implements AuthService {
         user.setPhone(newPhone);
         user.setShopName(trimToNull(request.getShopName()));
         user.setAddress(trimToNull(request.getAddress()));
+        // Update shop location if provided (nullable — clearing is allowed).
+        user.setLatitude(request.getLatitude());
+        user.setLongitude(request.getLongitude());
         if (request.getEmailNotificationsEnabled() != null) {
             user.setEmailNotificationsEnabled(request.getEmailNotificationsEnabled());
         }
@@ -323,6 +328,8 @@ public class AuthServiceImpl implements AuthService {
                 .phone(savedUser.getPhone())
                 .shopName(savedUser.getShopName())
                 .address(savedUser.getAddress())
+                .latitude(savedUser.getLatitude())
+                .longitude(savedUser.getLongitude())
                 .role(savedUser.getRole().getName())
                 .enabled(savedUser.getEnabled())
                 .emailNotificationsEnabled(savedUser.getEmailNotificationsEnabled())

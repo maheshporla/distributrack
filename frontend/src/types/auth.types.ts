@@ -88,6 +88,10 @@ export interface UserProfile {
   shopName?: string | null;
   /** B2B: shop address. Nullable. */
   address?: string | null;
+  /** Shopkeeper: shop delivery latitude. Null if not set. */
+  latitude?: number | null;
+  /** Shopkeeper: shop delivery longitude. Null if not set. */
+  longitude?: number | null;
   /** Delivery partner: city of operation. */
   city?: string | null;
   /** Delivery partner: vehicle type. */

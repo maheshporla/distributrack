@@ -51,6 +51,14 @@ public class User implements UserDetails {
     @Column(length = 255)
     private String address;
 
+    /** Shopkeeper: shop delivery latitude (set via search/GPS/map). */
+    @Column
+    private Double latitude;
+
+    /** Shopkeeper: shop delivery longitude (set via search/GPS/map). */
+    @Column
+    private Double longitude;
+
     /** Delivery partner: city of operation. */
     @Column(length = 100)
     private String city;

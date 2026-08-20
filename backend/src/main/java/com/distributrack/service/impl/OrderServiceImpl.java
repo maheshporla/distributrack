@@ -207,11 +207,16 @@ public class OrderServiceImpl implements OrderService {
                     ? order.getShopkeeper().getAddress()
                     : order.getShopkeeper().getFullName();
 
+            // Copy shopkeeper's saved location as the delivery destination.
+            User shopkeeper = order.getShopkeeper();
+
             com.distributrack.entity.Delivery delivery =
                     com.distributrack.entity.Delivery.builder()
                             .order(order)
                             .deliveryStatus(com.distributrack.enums.DeliveryStatus.AVAILABLE)
                             .deliveryAddress(deliveryAddress)
+                            .destinationLatitude(shopkeeper.getLatitude())
+                            .destinationLongitude(shopkeeper.getLongitude())
                             .build();
 
             delivery = deliveryRepository.save(delivery);

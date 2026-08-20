@@ -60,6 +60,10 @@ export interface Delivery {
   /** Order status is synced by the backend (ASSIGNED/DELIVERED/CANCELLED). */
   orderStatus: string;
   deliveryAddress: string;
+  /** Delivery destination latitude (from shopkeeper profile). */
+  destinationLatitude: number | null;
+  /** Delivery destination longitude (from shopkeeper profile). */
+  destinationLongitude: number | null;
   vehicleNumber: string | null;
   latitude: number | null;
   longitude: number | null;

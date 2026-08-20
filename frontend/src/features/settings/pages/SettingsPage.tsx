@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { User, Lock, Shield, Calendar, KeyRound, LogOut } from "lucide-react";
+import { User, Lock, Shield, Calendar, KeyRound, LogOut, MapPin } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,9 @@ import { useLogout } from "@/features/auth/hooks/useLogout";
 import type { UserProfile } from "@/types/auth.types";
 import { formatDate } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { ShopLocationEditor } from "@/features/settings/components/ShopLocationEditor";
 
-type SettingsTab = "profile" | "security";
+type SettingsTab = "profile" | "security" | "location";
 
 export function SettingsPage() {
   const logout = useLogout();
@@ -124,6 +125,7 @@ export function SettingsPage() {
 
   const tabs: { id: SettingsTab; label: string; icon: any }[] = [
     { id: "profile", label: "Profile & Account", icon: User },
+    { id: "location", label: "Shop Location", icon: MapPin },
     { id: "security", label: "Change Password", icon: Lock },
   ];
 
@@ -317,6 +319,56 @@ export function SettingsPage() {
                     </Button>
                   </div>
                 </form>
+              )}
+
+              {/* Shop Location */}
+              {activeTab === "location" && (
+                <div>
+                  <h4 className="text-md font-bold mb-4 flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    Shop Delivery Location
+                  </h4>
+                  <p className="mb-4 text-sm text-muted-foreground">
+                    Set your shop&apos;s delivery location. This will be used as the delivery
+                    destination when orders are placed on your account.
+                  </p>
+
+                  {profile.role === "SHOPKEEPER" ? (
+                    <ShopLocationEditor
+                      latitude={profile.latitude ?? null}
+                      longitude={profile.longitude ?? null}
+                      address={profile.address ?? null}
+                      isSaving={isSubmittingProfile}
+                      onSave={async (data) => {
+                        try {
+                          setIsSubmittingProfile(true);
+                          const updated = await authService.updateProfile({
+                            fullName: profile.fullName,
+                            phone: profile.phone,
+                            emailNotificationsEnabled: profile.emailNotificationsEnabled,
+                            smsNotificationsEnabled: profile.smsNotificationsEnabled,
+                            latitude: data.latitude,
+                            longitude: data.longitude,
+                          });
+                          setProfile(updated);
+                          toast.success("Shop location saved successfully.");
+                        } catch (error: unknown) {
+                          const message =
+                            error instanceof Error
+                              ? error.message
+                              : "Failed to save shop location.";
+                          toast.error(message);
+                        } finally {
+                          setIsSubmittingProfile(false);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Shop location is only available for Shopkeeper accounts.
+                    </p>
+                  )}
+                </div>
               )}
 
               {/* Password Change */}

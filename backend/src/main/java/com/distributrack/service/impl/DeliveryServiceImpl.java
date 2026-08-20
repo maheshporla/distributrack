@@ -481,6 +481,8 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .failureReason(delivery.getFailureReason())
                 .orderStatus(delivery.getOrder().getStatus())
                 .deliveryAddress(delivery.getDeliveryAddress())
+                .destinationLatitude(delivery.getDestinationLatitude())
+                .destinationLongitude(delivery.getDestinationLongitude())
                 .vehicleNumber(delivery.getVehicleNumber())
                 .latitude(delivery.getLatitude())
                 .longitude(delivery.getLongitude())

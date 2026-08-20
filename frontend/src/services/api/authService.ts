@@ -66,6 +66,8 @@ export const authService = {
     phone: string;
     emailNotificationsEnabled?: boolean;
     smsNotificationsEnabled?: boolean;
+    latitude?: number | null;
+    longitude?: number | null;
   }): Promise<UserProfile> {
     const response = await axiosInstance.put<UserProfile>(
       ENDPOINTS.AUTH.PROFILE,

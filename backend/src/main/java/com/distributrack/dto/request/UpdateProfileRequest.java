@@ -27,6 +27,12 @@ public class UpdateProfileRequest {
     @Size(max = 255, message = "Address cannot exceed 255 characters")
     private String address;
 
+    /** Shopkeeper: shop delivery latitude. Nullable. */
+    private Double latitude;
+
+    /** Shopkeeper: shop delivery longitude. Nullable. */
+    private Double longitude;
+
     private Boolean emailNotificationsEnabled;
 
     private Boolean smsNotificationsEnabled;

@@ -41,6 +41,13 @@ public class Delivery {
     @Column
     private String vehicleNumber;
 
+    // Delivery destination coordinates (copied from shopkeeper profile)
+    @Column(name = "destination_latitude")
+    private Double destinationLatitude;
+
+    @Column(name = "destination_longitude")
+    private Double destinationLongitude;
+
     // Live GPS tracking (nullable until the delivery boy starts tracking)
     @Column
     private Double latitude;

@@ -15,6 +15,7 @@ import {
 } from "@/schemas/order.schemas";
 
 import { orderService } from "@/services/api/orderService";
+import { authService } from "@/services/api/authService";
 import { productService } from "@/services/api/productService";
 import { userService } from "@/services/api/userService";
 import { useAuthStore } from "@/store/authStore";
@@ -116,6 +117,21 @@ export function OrderForm({ onSuccess, onCancel }: OrderFormProps) {
   // Submit
   // ---------------------------------------------------------
   const handleSubmitOrder = async () => {
+    // Check if shopkeeper has a delivery location set.
+    if (isShopkeeper) {
+      try {
+        const profile = await authService.getMe();
+        if (!profile.latitude && !profile.longitude) {
+          toast.error(
+            "Please set your shop delivery location in Settings before placing an order.",
+          );
+          return;
+        }
+      } catch {
+        // If profile fetch fails, proceed anyway — backend will handle it.
+      }
+    }
+
     // SHOPKEEPER never picks a shopkeeper: send their own id, which the
     // backend ignores and replaces with the JWT principal anyway.
     const payloadResult = orderPayloadSchema.safeParse({

@@ -27,6 +27,12 @@ public class UserResponse {
     /** B2B: shop address. Nullable. */
     private String address;
 
+    /** Shopkeeper: shop delivery latitude. Null if not set. */
+    private Double latitude;
+
+    /** Shopkeeper: shop delivery longitude. Null if not set. */
+    private Double longitude;
+
     private RoleName role;
 
     private Boolean enabled;

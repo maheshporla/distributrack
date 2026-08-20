@@ -1,5 +1,13 @@
 import { useEffect, useState } from "react";
 import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMap,
+} from "react-leaflet";
+import L from "leaflet";
+import {
   ArrowLeft,
   Crosshair,
   LocateFixed,
@@ -17,7 +25,7 @@ import {
   DELIVERY_STATUS_META,
   isDeliveryActive,
 } from "@/features/deliveries/deliveryStatus";
-import { DeliveryMap } from "@/features/deliveries/components/DeliveryMap";
+
 import { FailureReasonDialog } from "@/features/deliveries/components/FailureReasonDialog";
 import {
   useLiveTracking,
@@ -27,6 +35,37 @@ import {
 
 import type { Delivery, DeliveryStatus } from "@/types/delivery.types";
 import type { RoleName } from "@/types/auth.types";
+
+// --- Map marker icons ---
+const workerIcon = L.divIcon({
+  className: "",
+  iconSize: [32, 42],
+  iconAnchor: [16, 42],
+  popupAnchor: [0, -42],
+  html: `<div style="position:relative;width:32px;height:42px;"><svg viewBox="0 0 32 42" width="32" height="42" xmlns="http://www.w3.org/2000/svg"><path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 26 16 26s16-14 16-26C32 7.16 24.84 0 16 0z" fill="#2563eb"/><circle cx="16" cy="16" r="8" fill="white"/><text x="16" y="21" text-anchor="middle" font-size="14" font-weight="bold" fill="#2563eb">🚚</text></svg></div>`,
+});
+
+const destIcon = L.divIcon({
+  className: "",
+  iconSize: [32, 42],
+  iconAnchor: [16, 42],
+  popupAnchor: [0, -42],
+  html: `<div style="position:relative;width:32px;height:42px;"><svg viewBox="0 0 32 42" width="32" height="42" xmlns="http://www.w3.org/2000/svg"><path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 26 16 26s16-14 16-26C32 7.16 24.84 0 16 0z" fill="#dc2626"/><circle cx="16" cy="16" r="8" fill="white"/><text x="16" y="21" text-anchor="middle" font-size="14" font-weight="bold" fill="#dc2626">📍</text></svg></div>`,
+});
+
+function FitBounds({ workerPos, destPos }: { workerPos: [number, number] | null; destPos: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (workerPos && destPos) {
+      map.fitBounds(L.latLngBounds([workerPos, destPos]), { padding: [50, 50], maxZoom: 16 });
+    } else if (workerPos) {
+      map.setView(workerPos, 15, { animate: true });
+    } else if (destPos) {
+      map.setView(destPos, 15, { animate: true });
+    }
+  }, [workerPos, destPos, map]);
+  return null;
+}
 
 interface DeliveryDetailsProps {
   delivery: Delivery;
@@ -247,8 +286,8 @@ export function DeliveryDetails({
         </div>
       </div>
 
-      {/* Customer + address */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* Customer + address + destination */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-lg border border-border p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Customer / Shop
@@ -264,7 +303,26 @@ export function DeliveryDetails({
             Delivery Address
           </p>
           <p className="mt-1 font-medium">{delivery.deliveryAddress}</p>
+          {delivery.destinationLatitude != null && delivery.destinationLongitude != null && (
+            <p className="mt-1 font-mono text-xs text-muted-foreground">
+              📍 {delivery.destinationLatitude.toFixed(6)}, {delivery.destinationLongitude.toFixed(6)}
+            </p>
+          )}
         </div>
+
+        {delivery.destinationLatitude != null && delivery.destinationLongitude != null && (
+          <div className="rounded-lg border border-border p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              📍 Destination Location
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Lat: {delivery.destinationLatitude.toFixed(6)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Lng: {delivery.destinationLongitude.toFixed(6)}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Failure reason (shown when delivery is FAILED) */}
@@ -366,18 +424,74 @@ export function DeliveryDetails({
           </p>
         )}
 
-        {/* Map */}
-        {hasCoordinates && lat !== null && lng !== null ? (
-          <div className="mt-4">
-            <DeliveryMap latitude={lat} longitude={lng} />
-          </div>
-        ) : (
-          <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed">
-            <p className="text-sm text-muted-foreground">
-              Map will appear here once a location is reported.
-            </p>
-          </div>
-        )}
+        {/* Map — shows both delivery boy and destination markers */}
+        {(() => {
+          const hasDestCoords =
+            delivery.destinationLatitude != null &&
+            delivery.destinationLongitude != null &&
+            Number.isFinite(delivery.destinationLatitude) &&
+            Number.isFinite(delivery.destinationLongitude);
+          const destPos: [number, number] | null = hasDestCoords
+            ? [delivery.destinationLatitude!, delivery.destinationLongitude!]
+            : null;
+          const workerPos: [number, number] | null = hasCoordinates && lat !== null && lng !== null
+            ? [lat, lng]
+            : null;
+
+          if (!workerPos && !destPos) {
+            return (
+              <div className="mt-4 flex h-32 items-center justify-center rounded-lg border border-dashed">
+                <p className="text-sm text-muted-foreground">
+                  Map will appear here once a location is reported.
+                </p>
+              </div>
+            );
+          }
+
+          return (
+            <div className="mt-4">
+              <div className="mb-2 flex flex-wrap items-center gap-4 text-xs">
+                {workerPos && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block size-3 rounded-full bg-blue-600" />
+                    🚚 Delivery Boy
+                  </span>
+                )}
+                {destPos && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block size-3 rounded-full bg-red-600" />
+                    📍 Destination
+                  </span>
+                )}
+              </div>
+              <div className="h-64 w-full overflow-hidden rounded-lg border border-border">
+                <MapContainer
+                  center={workerPos ?? destPos!}
+                  zoom={15}
+                  className="h-full w-full"
+                  scrollWheelZoom={true}
+                  attributionControl={false}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  <FitBounds workerPos={workerPos} destPos={destPos} />
+                  {workerPos && (
+                    <Marker position={workerPos} icon={workerIcon}>
+                      <Popup><div className="text-sm font-semibold">🚚 {delivery.deliveryBoyName || "Delivery Boy"}</div></Popup>
+                    </Marker>
+                  )}
+                  {destPos && (
+                    <Marker position={destPos} icon={destIcon}>
+                      <Popup><div className="text-sm font-semibold">📍 {delivery.shopkeeperName}<br/><span className="font-normal text-muted-foreground">{delivery.deliveryAddress}</span></div></Popup>
+                    </Marker>
+                  )}
+                </MapContainer>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Failure reason dialog */}

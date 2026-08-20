@@ -33,6 +33,20 @@ const workerIcon = L.divIcon({
   </div>`,
 });
 
+const destIcon = L.divIcon({
+  className: "",
+  iconSize: [32, 42],
+  iconAnchor: [16, 42],
+  popupAnchor: [0, -42],
+  html: `<div style="position:relative;width:32px;height:42px;">
+    <svg viewBox="0 0 32 42" width="32" height="42" xmlns="http://www.w3.org/2000/svg">
+      <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 26 16 26s16-14 16-26C32 7.16 24.84 0 16 0z" fill="#dc2626"/>
+      <circle cx="16" cy="16" r="8" fill="white"/>
+      <text x="16" y="21" text-anchor="middle" font-size="14" font-weight="bold" fill="#dc2626">📍</text>
+    </svg>
+  </div>`,
+});
+
 
 
 /** How old a GPS update before we consider it stale (5 minutes). */
@@ -208,9 +222,15 @@ export function DeliveryTrackingView({
     ? [delivery.latitude!, delivery.longitude!]
     : null;
 
-  // Destination: Use shopkeeper's address as text only — we don't have
-  // destination lat/lng unless it was geocoded during order creation.
-  const hasDestCoords = false; // No destination coordinates stored in the current model
+  const hasDestCoords =
+    delivery.destinationLatitude !== null &&
+    delivery.destinationLongitude !== null &&
+    Number.isFinite(delivery.destinationLatitude) &&
+    Number.isFinite(delivery.destinationLongitude);
+
+  const destPos: [number, number] | null = hasDestCoords
+    ? [delivery.destinationLatitude!, delivery.destinationLongitude!]
+    : null;
 
   return (
     <div className="space-y-4">
@@ -313,6 +333,11 @@ export function DeliveryTrackingView({
           <p className="mt-1 text-sm text-muted-foreground">
             {delivery.deliveryAddress}
           </p>
+          {hasDestCoords && (
+            <p className="mt-1 font-mono text-xs text-muted-foreground">
+              📍 {delivery.destinationLatitude!.toFixed(6)}, {delivery.destinationLongitude!.toFixed(6)}
+            </p>
+          )}
           {!hasDestCoords && (
             <p className="mt-1 text-xs text-muted-foreground italic">
               Destination coordinates not available
@@ -336,10 +361,10 @@ export function DeliveryTrackingView({
           )}
         </div>
 
-        {hasWorkerCoords ? (
+        {(hasWorkerCoords || hasDestCoords) ? (
           <div className="h-[400px] w-full overflow-hidden rounded-lg">
             <MapContainer
-              center={workerPos!}
+              center={workerPos ?? destPos ?? [17.385, 78.4867]}
               zoom={15}
               className="h-full w-full"
               scrollWheelZoom={true}
@@ -349,27 +374,45 @@ export function DeliveryTrackingView({
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <FitBounds workerPos={workerPos} destPos={null} />
+              <FitBounds workerPos={workerPos} destPos={destPos} />
 
               {/* Worker marker */}
-              <Marker position={workerPos!} icon={workerIcon}>
-                <Popup>
-                  <div className="text-sm">
-                    <p className="font-semibold">
-                      🚚 {delivery.deliveryBoyName || "Delivery Boy"}
-                    </p>
-                    {delivery.deliveryBoyPhone && (
-                      <p className="text-muted-foreground">
-                        📞 {delivery.deliveryBoyPhone}
+              {workerPos && (
+                <Marker position={workerPos} icon={workerIcon}>
+                  <Popup>
+                    <div className="text-sm">
+                      <p className="font-semibold">
+                        🚚 {delivery.deliveryBoyName || "Delivery Boy"}
                       </p>
-                    )}
-                    <p className="text-muted-foreground">
-                      {delivery.latitude!.toFixed(6)},{" "}
-                      {delivery.longitude!.toFixed(6)}
-                    </p>
-                  </div>
-                </Popup>
-              </Marker>
+                      {delivery.deliveryBoyPhone && (
+                        <p className="text-muted-foreground">
+                          📞 {delivery.deliveryBoyPhone}
+                        </p>
+                      )}
+                      <p className="text-muted-foreground">
+                        {delivery.latitude!.toFixed(6)},{" "}
+                        {delivery.longitude!.toFixed(6)}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
+
+              {/* Destination marker */}
+              {destPos && (
+                <Marker position={destPos} icon={destIcon}>
+                  <Popup>
+                    <div className="text-sm">
+                      <p className="font-semibold">
+                        📍 {delivery.shopkeeperName}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {delivery.deliveryAddress}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              )}
             </MapContainer>
           </div>
         ) : (
