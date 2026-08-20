@@ -25,6 +25,7 @@ export const ROUTES = {
   SHOPKEEPER_SETTINGS: "/shopkeeper/settings",
 
   // Delivery Worker portal (separate from admin)
+  DELIVERY_WORKER_DASHBOARD: "/delivery/dashboard",
   DELIVERY_PROFILE: "/delivery/profile",
   DELIVERY_WORKER_DELIVERIES: "/delivery/deliveries",
   DELIVERY_WORKER_NOTIFICATIONS: "/delivery/notifications",

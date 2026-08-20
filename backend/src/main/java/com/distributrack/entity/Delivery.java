@@ -47,6 +47,13 @@ public class Delivery {
     @Column(name = "last_location_at")
     private LocalDateTime lastLocationAt;
 
+    /**
+     * Required when the delivery is marked as FAILED.
+     * Stored for audit and shopkeeper visibility.
+     */
+    @Column(name = "failure_reason", length = 500)
+    private String failureReason;
+
     @Column
     private LocalDateTime assignedAt;
 

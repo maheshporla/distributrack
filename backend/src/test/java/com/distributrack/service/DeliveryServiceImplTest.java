@@ -115,7 +115,7 @@ class DeliveryServiceImplTest {
                 .thenReturn(Optional.of(deliveryFor(otherBoy, DeliveryStatus.ASSIGNED, OrderStatus.APPROVED)));
 
         assertThrows(RuntimeException.class,
-                () -> deliveryService.updateDeliveryStatus(9L, "OUT_FOR_DELIVERY"));
+                () -> deliveryService.updateDeliveryStatus(9L, "OUT_FOR_DELIVERY", null));
     }
 
     @Test
@@ -125,7 +125,7 @@ class DeliveryServiceImplTest {
         Delivery delivery = deliveryFor(boy, DeliveryStatus.ASSIGNED, OrderStatus.ASSIGNED);
         when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
 
-        DeliveryResponse response = deliveryService.updateDeliveryStatus(9L, "OUT_FOR_DELIVERY");
+        DeliveryResponse response = deliveryService.updateDeliveryStatus(9L, "OUT_FOR_DELIVERY", null);
 
         assertEquals(DeliveryStatus.OUT_FOR_DELIVERY, response.getDeliveryStatus());
         // The order must track the delivery lifecycle so FAILED can send it
@@ -141,7 +141,7 @@ class DeliveryServiceImplTest {
         Delivery delivery = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
         when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
 
-        DeliveryResponse response = deliveryService.updateDeliveryStatus(9L, "DELIVERED");
+        DeliveryResponse response = deliveryService.updateDeliveryStatus(9L, "DELIVERED", null);
 
         assertEquals(DeliveryStatus.DELIVERED, response.getDeliveryStatus());
         assertEquals(OrderStatus.DELIVERED, delivery.getOrder().getStatus());
@@ -158,7 +158,7 @@ class DeliveryServiceImplTest {
 
         // ASSIGNED -> DELIVERED skips OUT_FOR_DELIVERY and must be rejected.
         assertThrows(IllegalStateException.class,
-                () -> deliveryService.updateDeliveryStatus(9L, "DELIVERED"));
+                () -> deliveryService.updateDeliveryStatus(9L, "DELIVERED", null));
     }
 
     @Test
@@ -168,9 +168,10 @@ class DeliveryServiceImplTest {
         Delivery delivery = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
         when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
 
-        DeliveryResponse response = deliveryService.updateDeliveryStatus(9L, "FAILED");
+        DeliveryResponse response = deliveryService.updateDeliveryStatus(9L, "FAILED", "Customer not available");
 
         assertEquals(DeliveryStatus.FAILED, response.getDeliveryStatus());
+        assertEquals("Customer not available", delivery.getFailureReason());
         // The order must be assignable again so another boy can retry.
         assertEquals(OrderStatus.APPROVED, delivery.getOrder().getStatus());
         verify(orderRepository).save(delivery.getOrder());

@@ -30,6 +30,7 @@ import { RequireRole } from "@/routes/RequireRole";
 import { UsersManagementPage } from "@/features/users/pages/UsersManagementPage";
 import { FirstAdminSetupPage } from "@/features/setup/pages/FirstAdminSetupPage";
 import { WorkerProfilePage } from "@/features/delivery-workers/pages/WorkerProfilePage";
+import { DeliveryBoyDashboardPage } from "@/features/delivery-workers/pages/DeliveryBoyDashboardPage";
 
 /**
  * Analytics and Reports are the only Recharts-heavy pages; lazy-loading
@@ -332,6 +333,14 @@ export function AppRouter() {
           </ProtectedRoute>
         }
       >
+        <Route
+          path={ROUTES.DELIVERY_WORKER_DASHBOARD}
+          element={
+            <RequireRole roles={["DELIVERY_BOY"]}>
+              <DeliveryBoyDashboardPage />
+            </RequireRole>
+          }
+        />
         <Route
           path={ROUTES.DELIVERY_PROFILE}
           element={

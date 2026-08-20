@@ -35,11 +35,16 @@ export const deliveryService = {
   async updateDeliveryStatus(
     id: number,
     status: DeliveryStatus,
+    failureReason?: string,
   ): Promise<Delivery> {
+    const params: Record<string, string> = { status };
+    if (failureReason) {
+      params.failureReason = failureReason;
+    }
     const response = await axiosInstance.put<Delivery>(
       `/delivery/${id}/status`,
       null,
-      { params: { status } },
+      { params },
     );
     return response.data;
   },

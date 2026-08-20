@@ -17,7 +17,7 @@ public interface DeliveryService {
     DeliveryResponse getDeliveryById(Long id);
 
     // Update Delivery Status
-    DeliveryResponse updateDeliveryStatus(Long id, String status);
+    DeliveryResponse updateDeliveryStatus(Long id, String status, String failureReason);
 
     // Delete Delivery
     void deleteDelivery(Long id);

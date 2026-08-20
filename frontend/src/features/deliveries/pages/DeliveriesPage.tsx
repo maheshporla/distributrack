@@ -99,7 +99,10 @@ export function DeliveriesPage() {
   // Status update (SA/OWNER/MANAGER/DELIVERY_BOY only)
   // =========================================================
 
-  const handleStatusChange = async (next: DeliveryStatus) => {
+  const handleStatusChange = async (
+    next: DeliveryStatus,
+    failureReason?: string,
+  ) => {
     if (!selectedDelivery) return;
 
     try {
@@ -108,6 +111,7 @@ export function DeliveriesPage() {
       const updated = await deliveryService.updateDeliveryStatus(
         selectedDelivery.id,
         next,
+        failureReason,
       );
 
       toast.success(

@@ -117,7 +117,7 @@ public class DeliveryServiceImpl implements DeliveryService {
 
     @Override
     @Transactional
-    public DeliveryResponse updateDeliveryStatus(Long id, String status) {
+    public DeliveryResponse updateDeliveryStatus(Long id, String status, String failureReason) {
 
         DeliveryStatus nextStatus = parseDeliveryStatus(status);
 
@@ -134,6 +134,13 @@ public class DeliveryServiceImpl implements DeliveryService {
         }
 
         delivery.setDeliveryStatus(nextStatus);
+
+        // Persist failure reason when the delivery is marked as failed.
+        if (nextStatus == DeliveryStatus.FAILED) {
+            delivery.setFailureReason(
+                    failureReason != null && !failureReason.isBlank() ? failureReason.trim() : null
+            );
+        }
 
         if (nextStatus == DeliveryStatus.OUT_FOR_DELIVERY) {
             // The boy started the run — sync the order so the lifecycle
@@ -311,6 +318,7 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .shopkeeperPhone(delivery.getOrder().getShopkeeper().getPhone())
                 .orderTotalAmount(delivery.getOrder().getTotalAmount())
                 .deliveryStatus(delivery.getDeliveryStatus())
+                .failureReason(delivery.getFailureReason())
                 .orderStatus(delivery.getOrder().getStatus())
                 .deliveryAddress(delivery.getDeliveryAddress())
                 .vehicleNumber(delivery.getVehicleNumber())

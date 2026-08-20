@@ -44,9 +44,10 @@ public class DeliveryController {
     @PutMapping("/{id}/status")
     public DeliveryResponse updateDeliveryStatus(
             @PathVariable Long id,
-            @RequestParam String status) {
+            @RequestParam String status,
+            @RequestParam(required = false) String failureReason) {
 
-        return deliveryService.updateDeliveryStatus(id, status);
+        return deliveryService.updateDeliveryStatus(id, status, failureReason);
     }
 
     // Update Delivery Live GPS Location

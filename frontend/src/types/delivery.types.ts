@@ -46,6 +46,8 @@ export interface Delivery {
   shopkeeperPhone: string;
   orderTotalAmount: number;
   deliveryStatus: DeliveryStatus;
+  /** Reason provided when the delivery was marked as FAILED. Null otherwise. */
+  failureReason: string | null;
   /** Order status is synced by the backend (ASSIGNED/DELIVERED/CANCELLED). */
   orderStatus: string;
   deliveryAddress: string;

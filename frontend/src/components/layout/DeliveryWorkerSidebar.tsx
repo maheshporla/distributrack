@@ -4,9 +4,10 @@ import { useAuthStore } from "@/store/authStore";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/constants/app.constants";
 import { ROUTES } from "@/constants/routes.constants";
-import { Route, Bell, Settings, User } from "lucide-react";
+import { LayoutDashboard, Route, Bell, Settings, User } from "lucide-react";
 
 const DELIVERY_NAV_ITEMS = [
+  { label: "Dashboard", path: ROUTES.DELIVERY_WORKER_DASHBOARD, icon: LayoutDashboard },
   { label: "My Deliveries", path: ROUTES.DELIVERY_WORKER_DELIVERIES, icon: Route },
   { label: "Notifications", path: ROUTES.DELIVERY_WORKER_NOTIFICATIONS, icon: Bell },
   { label: "Profile", path: ROUTES.DELIVERY_PROFILE, icon: User },

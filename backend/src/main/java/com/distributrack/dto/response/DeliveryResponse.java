@@ -40,6 +40,8 @@ public class DeliveryResponse {
 
     private DeliveryStatus deliveryStatus;
 
+    private String failureReason;
+
     private OrderStatus orderStatus;
 
     private String deliveryAddress;

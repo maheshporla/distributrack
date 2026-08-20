@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Crosshair,
@@ -17,6 +17,7 @@ import {
   isDeliveryActive,
 } from "@/features/deliveries/deliveryStatus";
 import { DeliveryMap } from "@/features/deliveries/components/DeliveryMap";
+import { FailureReasonDialog } from "@/features/deliveries/components/FailureReasonDialog";
 import { useLiveTracking } from "@/features/deliveries/hooks/useLiveTracking";
 
 import type { Delivery, DeliveryStatus } from "@/types/delivery.types";
@@ -28,7 +29,7 @@ interface DeliveryDetailsProps {
   /** Delivery id currently having its status updated. */
   updatingStatusId: number | null;
   onBack: () => void;
-  onStatusChange: (next: DeliveryStatus) => void;
+  onStatusChange: (next: DeliveryStatus, failureReason?: string) => void;
   /** Called when live tracking persists a new location. */
   onDeliveryUpdated: (updated: Delivery) => void;
 }
@@ -70,6 +71,26 @@ export function DeliveryDetails({
     : [];
 
   const isUpdating = updatingStatusId === delivery.id;
+
+  // --- Failure reason dialog state ---
+  const [showFailureDialog, setShowFailureDialog] = useState(false);
+
+  const handleActionClick = (next: DeliveryStatus) => {
+    if (next === "FAILED") {
+      setShowFailureDialog(true);
+    } else {
+      onStatusChange(next);
+    }
+  };
+
+  const handleFailureConfirm = (reason: string) => {
+    setShowFailureDialog(false);
+    onStatusChange("FAILED", reason);
+  };
+
+  const handleFailureCancel = () => {
+    setShowFailureDialog(false);
+  };
 
   const hasCoordinates =
     delivery.latitude !== null &&
@@ -117,7 +138,7 @@ export function DeliveryDetails({
               <Button
                 key={action.to}
                 variant={action.buttonVariant}
-                onClick={() => onStatusChange(action.to)}
+                onClick={() => handleActionClick(action.to)}
                 disabled={isUpdating}
               >
                 {isUpdating ? "Updating..." : action.label}
@@ -185,6 +206,16 @@ export function DeliveryDetails({
           <p className="mt-1 font-medium">{delivery.deliveryAddress}</p>
         </div>
       </div>
+
+      {/* Failure reason (shown when delivery is FAILED) */}
+      {delivery.deliveryStatus === "FAILED" && delivery.failureReason && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-destructive">
+            Failure Reason
+          </p>
+          <p className="mt-1 text-sm">{delivery.failureReason}</p>
+        </div>
+      )}
 
       {/* Live location */}
       <div className="rounded-lg border bg-card p-4">
@@ -262,6 +293,14 @@ export function DeliveryDetails({
           </div>
         )}
       </div>
+
+      {/* Failure reason dialog */}
+      <FailureReasonDialog
+        isOpen={showFailureDialog}
+        onConfirm={handleFailureConfirm}
+        onCancel={handleFailureCancel}
+        isSubmitting={isUpdating}
+      />
     </div>
   );
 }
