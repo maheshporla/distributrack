@@ -92,8 +92,8 @@ public class User implements UserDetails {
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private PasswordResetToken passwordResetToken;
+    // passwordResetToken is NOT mapped here — managed via
+    // PasswordResetTokenRepository to avoid cascade/flush conflicts.
 
     @OneToMany(mappedBy = "recipient", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Notification> notifications;

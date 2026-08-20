@@ -51,9 +51,8 @@ public class EmailServiceImpl implements EmailService {
 
     private void sendViaResend(String to, String subject, String htmlBody) {
         if (resendApiKey == null || resendApiKey.isBlank()) {
-            log.warn("[EMAIL] provider is resend but RESEND_API_KEY is not set — falling back to mock logging");
-            log.info("[EMAIL MOCK] (Resend) to={} | subject={} | body={}",
-                    to, subject, htmlBody.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim());
+            log.error("[EMAIL] provider=resend but RESEND_API_KEY is not configured — " +
+                    "email to {} will NOT be delivered. Set the RESEND_API_KEY environment variable.", to);
             return;
         }
 
@@ -66,10 +65,16 @@ public class EmailServiceImpl implements EmailService {
                     .html(htmlBody)
                     .build();
 
-            resend.emails().send(params);
-            log.info("[EMAIL] sent to {} via Resend", to);
+            log.info("[EMAIL] Sending via Resend: to={}, from={}, subject={}", to, from, subject);
+            var response = resend.emails().send(params);
+
+            if (response != null && response.getId() != null) {
+                log.info("[EMAIL] Resend delivery accepted: messageId={}, to={}", response.getId(), to);
+            } else {
+                log.warn("[EMAIL] Resend returned null response for to={}", to);
+            }
         } catch (Exception ex) {
-            log.warn("[EMAIL] failed to send to {} via Resend: {}", to, ex.getMessage());
+            log.error("[EMAIL] Resend FAILED for to={}: {}", to, ex.getMessage(), ex);
         }
     }
 

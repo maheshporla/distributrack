@@ -7,6 +7,7 @@ import com.distributrack.dto.request.CreateUserRequest;
 import com.distributrack.entity.Role;
 import com.distributrack.entity.User;
 import com.distributrack.enums.RoleName;
+import com.distributrack.repository.PasswordResetTokenRepository;
 import com.distributrack.repository.UserRepository;
 import com.distributrack.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,9 @@ class BackendApplicationTests {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PasswordResetTokenRepository passwordResetTokenRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -48,8 +52,13 @@ class BackendApplicationTests {
         String phone = "9998887776";
         String rawPassword = "password123";
 
-        // Clean up if previous runs left it
-        userRepository.findByEmail(email).ifPresent(u -> userRepository.delete(u));
+        // Clean up if previous runs left it — must remove tokens first
+        // because the FK from password_reset_tokens.user_id prevents user deletion.
+        userRepository.findByEmail(email).ifPresent(u -> {
+            passwordResetTokenRepository.findByUserId(u.getId())
+                    .ifPresent(passwordResetTokenRepository::delete);
+            userRepository.delete(u);
+        });
 
         CreateUserRequest request = CreateUserRequest.builder()
                 .fullName("Verify Delivery Boy")
@@ -90,7 +99,9 @@ class BackendApplicationTests {
         });
         assertEquals("Phone number already exists", phoneEx.getMessage());
 
-        // Cleanup
+        // Cleanup — remove tokens first to satisfy FK constraint
+        passwordResetTokenRepository.findByUserId(persisted.getId())
+                .ifPresent(passwordResetTokenRepository::delete);
         userRepository.delete(persisted);
         SecurityContextHolder.clearContext();
     }

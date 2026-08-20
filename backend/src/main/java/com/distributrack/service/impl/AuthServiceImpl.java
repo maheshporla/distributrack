@@ -184,20 +184,29 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public String forgotPassword(ForgotPasswordRequest request) {
 
+        log.info("[FORGOT-PASSWORD] Password reset requested for email={}", request.getEmail());
+
         // SECURITY: Always return the same generic message regardless of
         // whether the email exists — prevents user enumeration.
         var userOpt = userRepository.findByEmail(request.getEmail());
 
         if (userOpt.isEmpty()) {
-            log.debug("Password reset requested for unknown email: {}", request.getEmail());
+            log.info("[FORGOT-PASSWORD] No user found for email={} — returning generic response", request.getEmail());
             return "If an account with that email exists, a reset link has been sent.";
         }
 
         User user = userOpt.get();
+        log.info("[FORGOT-PASSWORD] User found: id={}, email={}", user.getId(), user.getEmail());
 
-        // Delete old reset token if it exists
+        // Invalidate any old reset tokens by expiring them (do NOT delete —
+        // avoids DataIntegrityViolationException from cascade/orphanRemoval
+        // on the User entity's @OneToOne relationship).
         passwordResetTokenRepository.findByUserId(user.getId())
-                .ifPresent(passwordResetTokenRepository::delete);
+                .ifPresent(oldToken -> {
+                    oldToken.setExpiryDate(LocalDateTime.now().minusMinutes(1));
+                    passwordResetTokenRepository.save(oldToken);
+                    log.info("[FORGOT-PASSWORD] Old token invalidated for user={}", user.getId());
+                });
 
         String token = UUID.randomUUID().toString();
 
@@ -208,6 +217,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         passwordResetTokenRepository.save(passwordResetToken);
+        log.info("[FORGOT-PASSWORD] Reset token generated for user={}", user.getId());
 
         // Build the reset link and send via email
         String resetLink = frontendUrl + "/reset-password?token=" + token;
@@ -227,16 +237,9 @@ public class AuthServiceImpl implements AuthService {
                 + "<p style='color:#999;font-size:12px;'>DistribuTrack — Distribution Management System</p>"
                 + "</div>";
 
+        log.info("[FORGOT-PASSWORD] Sending email to={}, frontendUrl={}", user.getEmail(), frontendUrl);
         emailService.send(user.getEmail(), subject, htmlBody);
-
-        // In development, log the full reset link so the operator can
-        // manually open it when SMTP is not configured.
-        log.warn("╔══════════════════════════════════════════════════════════════╗");
-        log.warn("║  DEV PASSWORD RESET LINK                                    ║");
-        log.warn("║  Email: {}", user.getEmail());
-        log.warn("║  Link:  {}", resetLink);
-        log.warn("║  Expires in 15 minutes. This is ONLY shown in development. ║");
-        log.warn("╚══════════════════════════════════════════════════════════════╝");
+        log.info("[FORGOT-PASSWORD] Email send initiated for user={}", user.getId());
 
         // Always return the same message regardless of whether the email
         // was actually sent — never reveal whether the address exists.
@@ -245,18 +248,23 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void resetPassword(ResetPasswordRequest request) {
 
+        log.info("[RESET-PASSWORD] Password reset requested");
+
         PasswordResetToken passwordResetToken = passwordResetTokenRepository
                 .findByToken(request.getToken())
-                .orElseThrow(() -> new RuntimeException("Invalid reset token"));
+                .orElseThrow(() -> {
+                    log.warn("[RESET-PASSWORD] Invalid or non-existent token");
+                    return new RuntimeException("Invalid reset token");
+                });
 
         if (passwordResetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
-
+            log.warn("[RESET-PASSWORD] Token expired for user={}", passwordResetToken.getUser().getId());
             passwordResetTokenRepository.delete(passwordResetToken);
-
             throw new RuntimeException("Reset token has expired");
         }
 
         User user = passwordResetToken.getUser();
+        log.info("[RESET-PASSWORD] Valid token for user={}; resetting password", user.getId());
 
         user.setPassword(
                 passwordEncoder.encode(request.getNewPassword())
@@ -264,8 +272,9 @@ public class AuthServiceImpl implements AuthService {
         user.setEnabled(true);
 
         userRepository.save(user);
-
         passwordResetTokenRepository.delete(passwordResetToken);
+
+        log.info("[RESET-PASSWORD] Password reset completed for user={}", user.getId());
     }
 
     @Override
