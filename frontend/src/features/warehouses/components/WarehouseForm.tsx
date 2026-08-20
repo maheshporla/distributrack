@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { MapPin, Navigation } from "lucide-react";
@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 import {
   warehouseSchema,
@@ -14,8 +15,12 @@ import {
 
 import { warehouseService } from "@/services/api/warehouseService";
 import { useGeolocation } from "@/features/warehouses/hooks/useGeolocation";
+import { useGeocoding } from "@/features/warehouses/hooks/useGeocoding";
+import { LocationSearch } from "@/features/warehouses/components/LocationSearch";
+import { InteractiveMap } from "@/features/warehouses/components/InteractiveMap";
 
 import type { Warehouse, WarehousePayload } from "@/types/warehouse.types";
+import type { GeocodingResult } from "@/features/warehouses/hooks/useGeocoding";
 
 interface WarehouseFormProps {
   warehouse?: Warehouse | null;
@@ -24,10 +29,15 @@ interface WarehouseFormProps {
 }
 
 /**
- * Create / edit warehouse form. Mirrors WarehouseRequest.java field for
- * field. The GPS section uses the browser Geolocation API (never
- * hardcoded coordinates) and previews the captured point on a free
- * OpenStreetMap embed — no paid map service involved.
+ * Create / edit warehouse form. Supports two ways to set GPS location:
+ *
+ *   1. Use Current Location — browser/device GPS
+ *   2. Search Location — Nominatim geocoding (type a place name)
+ *
+ * Plus: click anywhere on the interactive Leaflet map to fine-tune.
+ *
+ * The backend Warehouse entity already stores latitude/longitude/address
+ * — no schema changes are needed.
  */
 export function WarehouseForm({
   warehouse,
@@ -37,6 +47,11 @@ export function WarehouseForm({
   const isEditing = Boolean(warehouse);
 
   const { isLocating, locationError, getCurrentLocation } = useGeolocation();
+  const { reverseGeocode } = useGeocoding();
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const [selectedLocationName, setSelectedLocationName] = useState<string | null>(
+    warehouse?.address ?? null,
+  );
 
   const form = useForm<WarehouseFormValues>({
     resolver: zodResolver(warehouseSchema),
@@ -54,9 +69,7 @@ export function WarehouseForm({
     },
   });
 
-  // ---------------------------------------------------------
   // Reset form when the edited warehouse changes
-  // ---------------------------------------------------------
   useEffect(() => {
     if (warehouse) {
       form.reset({
@@ -71,10 +84,11 @@ export function WarehouseForm({
         longitude: warehouse.longitude,
         active: warehouse.active,
       });
+      setSelectedLocationName(warehouse.address);
     }
   }, [warehouse, form]);
 
-  // Live values for the coordinate readout + map preview
+  // Live coordinate values for the map.
   const watchedLatitude = form.watch("latitude");
   const watchedLongitude = form.watch("longitude");
 
@@ -82,11 +96,68 @@ export function WarehouseForm({
     Number.isFinite(watchedLatitude) && Number.isFinite(watchedLongitude);
 
   // ---------------------------------------------------------
-  // GPS capture
+  // Location handlers
   // ---------------------------------------------------------
-  const handleGetLocation = async () => {
-    const coords = await getCurrentLocation();
 
+  /** Called when the user selects a search result. */
+  const handleSearchSelect = useCallback(
+    (result: GeocodingResult) => {
+      form.setValue("latitude", result.lat, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      form.setValue("longitude", result.lon, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      setSelectedLocationName(result.displayName);
+
+      // Parse city/state from address details if available.
+      // Nominatim returns address components we can use.
+      const parts = result.displayName.split(", ");
+      if (parts.length >= 2) {
+        // Auto-fill city from the search result's second-to-last meaningful part.
+        const cityCandidates = parts.slice(0, Math.min(parts.length - 2, 3));
+        const city = cityCandidates[cityCandidates.length - 1]?.trim();
+        if (city && !form.getValues("city")) {
+          form.setValue("city", city, { shouldDirty: true });
+        }
+      }
+
+      toast.success("Location selected from search");
+    },
+    [form],
+  );
+
+  /** Called when the user clicks on the map. */
+  const handleMapClick = useCallback(
+    async (lat: number, lng: number) => {
+      form.setValue("latitude", lat, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+      form.setValue("longitude", lng, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+
+      // Reverse geocode to get a human-readable address.
+      setIsReverseGeocoding(true);
+      try {
+        const address = await reverseGeocode(lat, lng);
+        if (address) {
+          setSelectedLocationName(address);
+        }
+      } finally {
+        setIsReverseGeocoding(false);
+      }
+    },
+    [form, reverseGeocode],
+  );
+
+  /** Called when the user clicks "Use Current Location". */
+  const handleGetLocation = useCallback(async () => {
+    const coords = await getCurrentLocation();
     if (!coords) {
       toast.error("Could not retrieve your location");
       return;
@@ -101,18 +172,19 @@ export function WarehouseForm({
       shouldDirty: true,
     });
 
-    toast.success("Location captured from your device");
-  };
+    // Reverse geocode to get a name for the GPS location.
+    setIsReverseGeocoding(true);
+    try {
+      const address = await reverseGeocode(coords.latitude, coords.longitude);
+      if (address) {
+        setSelectedLocationName(address);
+      }
+    } finally {
+      setIsReverseGeocoding(false);
+    }
 
-  // Free OpenStreetMap embed (no API key / no paid service).
-  // Only rendered once both coordinates are valid.
-  const mapEmbedUrl = hasCoordinates
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${
-        watchedLongitude - 0.002
-      }%2C${watchedLatitude - 0.002}%2C${watchedLongitude + 0.002}%2C${
-        watchedLatitude + 0.002
-      }&layer=mapnik&marker=${watchedLatitude}%2C${watchedLongitude}`
-    : "";
+    toast.success("Location captured from your device");
+  }, [getCurrentLocation, form, reverseGeocode]);
 
   // ---------------------------------------------------------
   // Submit
@@ -194,7 +266,6 @@ export function WarehouseForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* City */}
         <div className="space-y-2">
           <label htmlFor="city" className="text-sm font-medium">
             City *
@@ -213,7 +284,6 @@ export function WarehouseForm({
           )}
         </div>
 
-        {/* State */}
         <div className="space-y-2">
           <label htmlFor="state" className="text-sm font-medium">
             State *
@@ -234,7 +304,6 @@ export function WarehouseForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {/* Pincode */}
         <div className="space-y-2">
           <label htmlFor="pincode" className="text-sm font-medium">
             Pincode *
@@ -255,7 +324,6 @@ export function WarehouseForm({
           )}
         </div>
 
-        {/* Contact Person */}
         <div className="space-y-2">
           <label htmlFor="contactPerson" className="text-sm font-medium">
             Contact Person *
@@ -296,12 +364,20 @@ export function WarehouseForm({
       </div>
 
       {/* =====================================================
-          GPS Location
+          GPS Location — Search + Map + Current Location
       ====================================================== */}
-      <div className="space-y-3 rounded-lg border border-border p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-medium">GPS Location *</p>
+      <div className="space-y-4 rounded-lg border border-border p-4">
+        <p className="text-sm font-medium">GPS Location *</p>
 
+        {/* --- Search Location --- */}
+        <LocationSearch
+          onSelect={handleSearchSelect}
+          placeholder="Search location (e.g. Vignan Institute of Technology and Science, Hyderabad)"
+          disabled={form.formState.isSubmitting}
+        />
+
+        {/* --- Use Current Location --- */}
+        <div className="flex items-center gap-3">
           <Button
             type="button"
             variant="outline"
@@ -310,67 +386,34 @@ export function WarehouseForm({
             disabled={isLocating || form.formState.isSubmitting}
           >
             <Navigation className="mr-2 h-4 w-4" />
-
-            {isLocating
-              ? "Getting location..."
-              : "Get Current Location"}
+            {isLocating ? "Getting location..." : "Use Current Location"}
           </Button>
+
+          {isReverseGeocoding && (
+            <span className="text-xs text-muted-foreground">
+              Resolving address…
+            </span>
+          )}
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Use your device's location to fill the coordinates. Permission
-          is requested by the browser — nothing is hardcoded.
+          Search for a location or use your device GPS. You can also click
+          anywhere on the map below to set the exact position.
         </p>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {/* Latitude */}
-          <div className="space-y-2">
-            <label htmlFor="latitude" className="text-sm font-medium">
-              Latitude
-            </label>
-
-            <Input
-              id="latitude"
-              type="number"
-              step="any"
-              placeholder="-90 to 90"
-              {...form.register("latitude", {
-                valueAsNumber: true,
-              })}
-            />
-
-            {form.formState.errors.latitude && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.latitude.message}
-              </p>
-            )}
+        {/* --- Selected Location Indicator --- */}
+        {selectedLocationName && hasCoordinates && (
+          <div className="rounded-md bg-primary/5 px-3 py-2">
+            <p className="flex items-start gap-2 text-xs">
+              <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="font-medium text-foreground">
+                {selectedLocationName}
+              </span>
+            </p>
           </div>
+        )}
 
-          {/* Longitude */}
-          <div className="space-y-2">
-            <label htmlFor="longitude" className="text-sm font-medium">
-              Longitude
-            </label>
-
-            <Input
-              id="longitude"
-              type="number"
-              step="any"
-              placeholder="-180 to 180"
-              {...form.register("longitude", {
-                valueAsNumber: true,
-              })}
-            />
-
-            {form.formState.errors.longitude && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.longitude.message}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Geolocation failure reason (permission denied / unavailable / timeout) */}
+        {/* --- Geolocation errors --- */}
         {locationError && (
           <p className="flex items-start gap-2 text-sm text-destructive">
             <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
@@ -378,23 +421,41 @@ export function WarehouseForm({
           </p>
         )}
 
-        {/* Coordinate readout + OpenStreetMap preview */}
+        <Separator />
+
+        {/* --- Interactive Map --- */}
+        <InteractiveMap
+          latitude={watchedLatitude}
+          longitude={watchedLongitude}
+          onLocationSelect={handleMapClick}
+          height="h-64"
+        />
+
+        {/* --- Coordinate Readout --- */}
         {hasCoordinates && (
-          <div className="space-y-3">
-            <p className="text-sm">
-              <span className="font-medium">
-                {watchedLatitude.toFixed(6)}, {watchedLongitude.toFixed(6)}
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <p>
+              <span className="font-mono font-medium">
+                {watchedLatitude!.toFixed(6)}, {watchedLongitude!.toFixed(6)}
               </span>{" "}
               <span className="text-muted-foreground">(lat, lng)</span>
             </p>
-
-            <iframe
-              title="Warehouse location preview"
-              src={mapEmbedUrl}
-              className="h-52 w-full rounded-md border border-border"
-              loading="lazy"
-            />
           </div>
+        )}
+
+        {/* --- Hidden lat/lng fields for validation --- */}
+        <input type="hidden" {...form.register("latitude", { valueAsNumber: true })} />
+        <input type="hidden" {...form.register("longitude", { valueAsNumber: true })} />
+
+        {form.formState.errors.latitude && (
+          <p className="text-sm text-destructive">
+            {form.formState.errors.latitude.message}
+          </p>
+        )}
+        {form.formState.errors.longitude && (
+          <p className="text-sm text-destructive">
+            {form.formState.errors.longitude.message}
+          </p>
         )}
       </div>
 

@@ -25,6 +25,7 @@ import { useAuthStore } from "@/store/authStore";
 import { DELIVERY_STATUS_META } from "@/features/deliveries/deliveryStatus";
 import { ROUTES } from "@/constants/routes.constants";
 import type { Delivery } from "@/types/delivery.types";
+import { cn } from "@/lib/utils";
 import { formatDateTime, formatINR } from "@/lib/formatters";
 
 /**
@@ -82,6 +83,24 @@ export function DeliveryBoyDashboardPage() {
       return assigned >= today;
     });
   }, [deliveries]);
+
+  // --- GPS freshness helper ---
+  const STALE_MS = 5 * 60 * 1_000;
+  function gpsDot(delivery: Delivery) {
+    const hasCoords = delivery.latitude !== null && delivery.longitude !== null;
+    const isStale = !delivery.lastLocationAt ||
+      Date.now() - new Date(delivery.lastLocationAt).getTime() > STALE_MS;
+    if (!hasCoords) return null;
+    return (
+      <span
+        className={cn(
+          "inline-block size-1.5 rounded-full",
+          isStale ? "bg-amber-500" : "bg-green-500",
+        )}
+        title={isStale ? "GPS: Stale" : "GPS: Live"}
+      />
+    );
+  }
 
   // --- Recent deliveries (last 5) ---
   const recentDeliveries = useMemo(() => {
@@ -212,6 +231,7 @@ export function DeliveryBoyDashboardPage() {
                         <Badge variant={statusMeta.badgeVariant}>
                           {statusMeta.label}
                         </Badge>
+                        {gpsDot(delivery)}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {delivery.shopkeeperName}
@@ -275,6 +295,7 @@ export function DeliveryBoyDashboardPage() {
                         <Badge variant={statusMeta.badgeVariant}>
                           {statusMeta.label}
                         </Badge>
+                        {gpsDot(delivery)}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {delivery.shopkeeperName} — {delivery.deliveryAddress}

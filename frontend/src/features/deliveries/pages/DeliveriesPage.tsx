@@ -21,6 +21,7 @@ import {
   type Delivery,
   type DeliveryStatus,
 } from "@/types/delivery.types";
+import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/formatters";
 
 type PageView = "list" | "details" | "form";
@@ -139,6 +140,39 @@ export function DeliveriesPage() {
     );
     setSelectedDelivery(updated);
   };
+
+  /**
+   * GPS freshness indicator for the list view.
+   * Shows a colored dot: green = recent, amber = stale, gray = none.
+   */
+  const STALE_MS = 5 * 60 * 1_000;
+  function GpsIndicator({ delivery }: { delivery: Delivery }) {
+    const hasCoords =
+      delivery.latitude !== null &&
+      delivery.longitude !== null;
+    const isStale = !delivery.lastLocationAt ||
+      Date.now() - new Date(delivery.lastLocationAt).getTime() > STALE_MS;
+
+    if (!hasCoords) {
+      return (
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-muted-foreground/30" />
+          No GPS
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-xs">
+        <span
+          className={cn(
+            "size-1.5 rounded-full",
+            isStale ? "bg-amber-500" : "bg-green-500",
+          )}
+        />
+        {isStale ? "Stale" : "Live"}
+      </span>
+    );
+  }
 
   // =========================================================
   // View switching
@@ -331,6 +365,7 @@ export function DeliveriesPage() {
                   <th className="px-4 py-3">Delivery Boy</th>
                   <th className="px-4 py-3">Assigned</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">GPS</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -367,6 +402,10 @@ export function DeliveriesPage() {
                         <Badge variant={statusMeta.badgeVariant}>
                           {statusMeta.label}
                         </Badge>
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <GpsIndicator delivery={delivery} />
                       </td>
 
                       <td className="px-4 py-3">

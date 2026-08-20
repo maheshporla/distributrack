@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_APP_NAME: string;
   readonly VITE_APP_ENV: "development" | "production" | "staging";
   readonly VITE_ENABLE_MOCK_API: string;
+  readonly VITE_NOMINATIM_BASE_URL?: string;
 }
 
 interface ImportMeta {

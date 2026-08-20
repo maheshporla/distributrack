@@ -1,17 +1,22 @@
 import { useEffect, useState } from "react";
 
 /**
- * Returns a debounced copy of `value` that only updates after `delayMs`
- * of no further changes. Used for search inputs that filter server data
- * (e.g. product search) to avoid firing a request on every keystroke.
+ * Debounces a value by `delay` milliseconds. The returned value only
+ * updates after the input has been still for the specified delay.
+ * Useful for throttling search-as-you-type requests.
+ *
+ * @example
+ * const [query, setQuery] = useState("");
+ * const debouncedQuery = useDebounce(query, 400);
+ * // debouncedQuery updates 400ms after the user stops typing
  */
-export function useDebounce<T>(value: T, delayMs = 400): T {
-  const [debounced, setDebounced] = useState(value);
+export function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
   useEffect(() => {
-    const timeout = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(timeout);
-  }, [value, delayMs]);
+    const timer = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
 
-  return debounced;
+  return debouncedValue;
 }
