@@ -1,27 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Search, Truck, UserX, UserCheck } from "lucide-react";
+import { Pencil, Plus, Search, Truck, UserX, UserCheck, Users, Activity, WifiOff, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { StatCard } from "@/components/shared/StatCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 
 import { userService } from "@/services/api/userService";
+import { workerService, type DeliveryBoyStats } from "@/services/api/workerService";
 
 import { DeliveryWorkerForm } from "@/features/delivery-workers/components/DeliveryWorkerForm";
 
 import type { UserProfile } from "@/types/auth.types";
-import { formatDate } from "@/lib/formatters";
 
 type PageView = "list" | "form";
+
+const AVAILABILITY_META: Record<string, { label: string; variant: "default" | "success" | "secondary" | "destructive" | "warning" }> = {
+  AVAILABLE: { label: "Available", variant: "success" },
+  BUSY: { label: "Busy", variant: "warning" },
+  OFFLINE: { label: "Offline", variant: "secondary" },
+};
 
 export function DeliveryWorkersPage() {
   const [workers, setWorkers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [stats, setStats] = useState<DeliveryBoyStats | null>(null);
 
   const [searchKeyword, setSearchKeyword] = useState("");
 
@@ -30,7 +38,7 @@ export function DeliveryWorkersPage() {
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
   // =========================================================
-  // Load delivery workers (DELIVERY_BOY accounts)
+  // Load delivery workers + stats
   // =========================================================
 
   const loadWorkers = async () => {
@@ -38,8 +46,12 @@ export function DeliveryWorkersPage() {
       setIsLoading(true);
       setLoadError(null);
 
-      const data = await userService.getUsers({ role: "DELIVERY_BOY" });
+      const [data, statsData] = await Promise.all([
+        userService.getUsers({ role: "DELIVERY_BOY" }),
+        workerService.getDeliveryBoyStats(),
+      ]);
       setWorkers(data);
+      setStats(statsData);
     } catch (error) {
       console.error(error);
       setLoadError("Failed to load delivery workers");
@@ -173,6 +185,42 @@ export function DeliveryWorkersPage() {
         }
       />
 
+      {/* --- Statistics Cards --- */}
+      {stats && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          <StatCard
+            label="Total Delivery Boys"
+            value={stats.total.toLocaleString()}
+            icon={Users}
+            isLoading={isLoading}
+          />
+          <StatCard
+            label="Available Now"
+            value={stats.available.toLocaleString()}
+            icon={Activity}
+            isLoading={isLoading}
+          />
+          <StatCard
+            label="Busy"
+            value={stats.busy.toLocaleString()}
+            icon={Truck}
+            isLoading={isLoading}
+          />
+          <StatCard
+            label="Offline"
+            value={stats.offline.toLocaleString()}
+            icon={WifiOff}
+            isLoading={isLoading}
+          />
+          <StatCard
+            label="Pending Applications"
+            value={stats.pendingApplications.toLocaleString()}
+            icon={Clock}
+            isLoading={isLoading}
+          />
+        </div>
+      )}
+
       {/* Search */}
       <div className="relative max-w-md">
         <Search
@@ -240,72 +288,100 @@ export function DeliveryWorkersPage() {
               <thead>
                 <tr className="border-b text-left">
                   <th className="px-4 py-3">Worker</th>
-                  <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Phone</th>
-                  <th className="px-4 py-3">Created</th>
-                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">City</th>
+                  <th className="px-4 py-3">Vehicle</th>
+                  <th className="px-4 py-3">Account</th>
+                  <th className="px-4 py-3">Availability</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
 
               <tbody>
-                {displayedWorkers.map((worker) => (
-                  <tr key={worker.id} className="border-b last:border-0">
-                    <td className="px-4 py-3 font-medium">
-                      {worker.fullName}
-                    </td>
+                {displayedWorkers.map((worker) => {
+                  const availMeta =
+                    AVAILABILITY_META[worker.availability ?? "OFFLINE"];
 
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {worker.email}
-                    </td>
+                  return (
+                    <tr key={worker.id} className="border-b last:border-0">
+                      <td className="px-4 py-3">
+                        <div className="font-medium">{worker.fullName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {worker.email}
+                        </div>
+                      </td>
 
-                    <td className="px-4 py-3">{worker.phone}</td>
+                      <td className="px-4 py-3">{worker.phone}</td>
 
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {formatDate(worker.createdAt)}
-                    </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {worker.city || "—"}
+                      </td>
 
-                    <td className="px-4 py-3">
-                      <Badge
-                        variant={worker.enabled ? "success" : "secondary"}
-                      >
-                        {worker.enabled ? "Enabled" : "Disabled"}
-                      </Badge>
-                    </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {(() => {
+                          const vt = worker.vehicleType;
+                          const vn = worker.vehicleNumber;
+                          if (vt && vn) return `${vt} · ${vn}`;
+                          if (vt) return vt;
+                          if (vn) return vn;
+                          return "—";
+                        })()}
+                      </td>
 
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditWorker(worker)}
+                      <td className="px-4 py-3">
+                        <Badge
+                          variant={worker.enabled ? "success" : "secondary"}
                         >
-                          <Pencil className="mr-1 h-4 w-4" />
-                          Edit
-                        </Button>
+                          {worker.enabled ? "Active" : "Pending/Disabled"}
+                        </Badge>
+                      </td>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleEnabled(worker)}
-                          disabled={togglingId === worker.id}
-                        >
-                          {worker.enabled ? (
-                            <>
-                              <UserX className="mr-1 h-4 w-4" />
-                              Disable
-                            </>
-                          ) : (
-                            <>
-                              <UserCheck className="mr-1 h-4 w-4" />
-                              Enable
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-4 py-3">
+                        {worker.enabled && worker.availability ? (
+                          <Badge variant={availMeta.variant}>
+                            {availMeta.label}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            —
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditWorker(worker)}
+                          >
+                            <Pencil className="mr-1 h-4 w-4" />
+                            Edit
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleToggleEnabled(worker)}
+                            disabled={togglingId === worker.id}
+                          >
+                            {worker.enabled ? (
+                              <>
+                                <UserX className="mr-1 h-4 w-4" />
+                                Disable
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="mr-1 h-4 w-4" />
+                                Enable
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

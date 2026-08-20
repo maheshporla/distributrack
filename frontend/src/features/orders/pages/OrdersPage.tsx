@@ -111,7 +111,13 @@ export function OrdersPage() {
         next,
       );
 
-      toast.success(`Order marked as ${next.replace(/_/g, " ").toLowerCase()}`);
+      if (next === "APPROVED") {
+        toast.success(
+          "Order approved. Waiting for an available delivery partner.",
+        );
+      } else {
+        toast.success(`Order marked as ${next.replace(/_/g, " ").toLowerCase()}`);
+      }
 
       setOrders((prev) =>
         prev.map((order) =>
@@ -121,7 +127,9 @@ export function OrdersPage() {
       setSelectedOrder(updated);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update order status");
+      const message =
+        error instanceof Error ? error.message : "Failed to update order status";
+      toast.error(message);
     } finally {
       setUpdatingStatusId(null);
     }

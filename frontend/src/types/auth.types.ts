@@ -88,8 +88,16 @@ export interface UserProfile {
   shopName?: string | null;
   /** B2B: shop address. Nullable. */
   address?: string | null;
+  /** Delivery partner: city of operation. */
+  city?: string | null;
+  /** Delivery partner: vehicle type. */
+  vehicleType?: string | null;
+  /** Delivery partner: vehicle number. */
+  vehicleNumber?: string | null;
   role: RoleName;
   enabled: boolean;
+  /** Worker availability (AVAILABLE/BUSY/OFFLINE). Null for non-worker roles. */
+  availability?: "AVAILABLE" | "BUSY" | "OFFLINE";
   emailNotificationsEnabled?: boolean;
   smsNotificationsEnabled?: boolean;
   createdAt: string;

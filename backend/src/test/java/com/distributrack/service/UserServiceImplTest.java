@@ -6,6 +6,7 @@ import com.distributrack.dto.response.UserResponse;
 import com.distributrack.entity.Role;
 import com.distributrack.entity.User;
 import com.distributrack.enums.RoleName;
+import com.distributrack.enums.WorkerAvailability;
 import com.distributrack.repository.RoleRepository;
 import com.distributrack.repository.UserRepository;
 import com.distributrack.security.CurrentUserService;
@@ -39,6 +40,7 @@ class UserServiceImplTest {
     );
 
     private User admin;
+    private User shopkeeper;
 
     @BeforeEach
     void setUp() {
@@ -49,6 +51,15 @@ class UserServiceImplTest {
                 .phone("9000000000")
                 .enabled(true)
                 .role(new Role(1L, RoleName.SUPER_ADMIN))
+                .build();
+
+        shopkeeper = User.builder()
+                .id(3L)
+                .fullName("Shop One")
+                .email("shop1@test.com")
+                .phone("9000000001")
+                .enabled(true)
+                .role(new Role(6L, RoleName.SHOPKEEPER))
                 .build();
 
         when(passwordEncoder.encode(any(String.class))).thenReturn("$2a$10$encoded");
@@ -261,5 +272,137 @@ class UserServiceImplTest {
                 () -> userService.approveDeliveryApplication(10L));
 
         assertTrue(ex.getMessage().contains("already approved"));
+    }
+
+    // --- Worker Availability Tests ---
+
+    @Test
+    void workerCanToggleToAvailable() {
+
+        User worker = User.builder()
+                .id(20L)
+                .fullName("Worker")
+                .email("worker@test.com")
+                .phone("9555555555")
+                .enabled(true)
+                .availability(WorkerAvailability.OFFLINE)
+                .role(new Role(5L, RoleName.DELIVERY_BOY))
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(worker);
+
+        UserResponse response = userService.toggleAvailability(WorkerAvailability.AVAILABLE);
+
+        assertEquals(WorkerAvailability.AVAILABLE, response.getAvailability());
+        verify(userRepository).save(worker);
+    }
+
+    @Test
+    void workerCanToggleToOffline() {
+
+        User worker = User.builder()
+                .id(20L)
+                .fullName("Worker")
+                .email("worker@test.com")
+                .phone("9555555555")
+                .enabled(true)
+                .availability(WorkerAvailability.AVAILABLE)
+                .role(new Role(5L, RoleName.DELIVERY_BOY))
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(worker);
+
+        UserResponse response = userService.toggleAvailability(WorkerAvailability.OFFLINE);
+
+        assertEquals(WorkerAvailability.OFFLINE, response.getAvailability());
+        verify(userRepository).save(worker);
+    }
+
+    @Test
+    void nonWorkerCannotToggleAvailability() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+
+        assertThrows(RuntimeException.class,
+                () -> userService.toggleAvailability(WorkerAvailability.AVAILABLE));
+    }
+
+    @Test
+    void busyWorkerCannotGoAvailable() {
+
+        User worker = User.builder()
+                .id(20L)
+                .fullName("Worker")
+                .email("worker@test.com")
+                .phone("9555555555")
+                .enabled(true)
+                .availability(WorkerAvailability.BUSY)
+                .role(new Role(5L, RoleName.DELIVERY_BOY))
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(worker);
+
+        assertThrows(RuntimeException.class,
+                () -> userService.toggleAvailability(WorkerAvailability.AVAILABLE));
+    }
+
+    @Test
+    void adminCannotSetBusyAvailability() {
+
+        User worker = User.builder()
+                .id(20L)
+                .fullName("Worker")
+                .email("worker@test.com")
+                .phone("9555555555")
+                .enabled(true)
+                .availability(WorkerAvailability.OFFLINE)
+                .role(new Role(5L, RoleName.DELIVERY_BOY))
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(worker);
+
+        assertThrows(RuntimeException.class,
+                () -> userService.toggleAvailability(WorkerAvailability.BUSY));
+    }
+
+    // --- Delivery Boy Statistics Tests ---
+
+    @Test
+    void adminCanGetDeliveryBoyStats() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+
+        User available = User.builder()
+                .id(20L).fullName("A").email("a@test.com")
+                .enabled(true).availability(WorkerAvailability.AVAILABLE)
+                .role(new Role(5L, RoleName.DELIVERY_BOY)).build();
+        User busy = User.builder()
+                .id(21L).fullName("B").email("b@test.com")
+                .enabled(true).availability(WorkerAvailability.BUSY)
+                .role(new Role(5L, RoleName.DELIVERY_BOY)).build();
+        User offline = User.builder()
+                .id(22L).fullName("C").email("c@test.com")
+                .enabled(true).availability(WorkerAvailability.OFFLINE)
+                .role(new Role(5L, RoleName.DELIVERY_BOY)).build();
+        User pending = User.builder()
+                .id(23L).fullName("D").email("d@test.com")
+                .enabled(false).availability(WorkerAvailability.OFFLINE)
+                .role(new Role(5L, RoleName.DELIVERY_BOY)).build();
+
+        when(userRepository.findByRole_Name(RoleName.DELIVERY_BOY))
+                .thenReturn(List.of(available, busy, offline, pending));
+
+        var stats = userService.getDeliveryBoyStatistics();
+
+        assertEquals(4L, stats.get("total"));
+        assertEquals(1L, stats.get("available"));
+        assertEquals(1L, stats.get("busy"));
+        assertEquals(1L, stats.get("offline"));
+        assertEquals(1L, stats.get("pendingApplications"));
+    }
+
+    @Test
+    void nonAdminCannotGetDeliveryBoyStats() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(shopkeeper);
+
+        assertThrows(RuntimeException.class,
+                () -> userService.getDeliveryBoyStatistics());
     }
 }

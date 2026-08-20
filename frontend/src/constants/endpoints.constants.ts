@@ -52,6 +52,8 @@ export const ENDPOINTS = {
     DELIVERY_APPLICATIONS: "/users/delivery-applications",
     APPROVE_DELIVERY: (id: string | number) => `/users/delivery-applications/${id}/approve`,
     REJECT_DELIVERY: (id: string | number) => `/users/delivery-applications/${id}/reject`,
+    AVAILABILITY: "/users/availability",
+    DELIVERY_BOY_STATS: "/users/delivery-boy-stats",
   },
   /** Customers are SHOPKEEPER accounts managed through /api/users. */
   CUSTOMERS: {

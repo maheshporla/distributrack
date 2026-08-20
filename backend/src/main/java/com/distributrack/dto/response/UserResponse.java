@@ -1,6 +1,7 @@
 package com.distributrack.dto.response;
 
 import com.distributrack.enums.RoleName;
+import com.distributrack.enums.WorkerAvailability;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -29,6 +30,9 @@ public class UserResponse {
     private RoleName role;
 
     private Boolean enabled;
+
+    /** Worker availability state (AVAILABLE/BUSY/OFFLINE). Null for non-worker roles. */
+    private WorkerAvailability availability;
 
     /** Delivery partner: city of operation. Nullable. */
     private String city;

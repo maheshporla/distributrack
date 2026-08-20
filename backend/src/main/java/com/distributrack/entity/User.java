@@ -1,5 +1,6 @@
 package com.distributrack.entity;
 
+import com.distributrack.enums.WorkerAvailability;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -61,6 +62,11 @@ public class User implements UserDetails {
     /** Delivery partner: vehicle registration number. */
     @Column(name = "vehicle_number", length = 20)
     private String vehicleNumber;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    @Builder.Default
+    private WorkerAvailability availability = WorkerAvailability.OFFLINE;
 
     @Column(nullable = false)
     @Builder.Default

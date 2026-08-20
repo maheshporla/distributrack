@@ -109,6 +109,14 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/delivery-applications/**")
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
 
+                        // Worker availability toggle: DELIVERY_BOY only
+                        .requestMatchers(HttpMethod.PUT, "/api/users/availability")
+                        .hasRole("DELIVERY_BOY")
+
+                        // Delivery boy statistics: admin roles only
+                        .requestMatchers(HttpMethod.GET, "/api/users/delivery-boy-stats")
+                        .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
+
                         .requestMatchers("/api/users/**")
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
 

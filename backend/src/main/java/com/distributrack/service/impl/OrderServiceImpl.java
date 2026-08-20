@@ -10,6 +10,7 @@ import com.distributrack.entity.Product;
 import com.distributrack.entity.User;
 import com.distributrack.enums.OrderStatus;
 import com.distributrack.enums.RoleName;
+import com.distributrack.enums.WorkerAvailability;
 import com.distributrack.repository.DeliveryRepository;
 import com.distributrack.repository.OrderItemRepository;
 import com.distributrack.repository.OrderRepository;
@@ -20,6 +21,7 @@ import com.distributrack.service.AuditService;
 import com.distributrack.service.NotificationService;
 import com.distributrack.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
@@ -184,33 +187,135 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * Creates an AVAILABLE delivery for an approved order.
-     * No delivery boy is assigned yet — workers accept it.
+     * Creates an AVAILABLE delivery for an approved order, then tries
+     * automatic assignment to an eligible worker.
+     *
+     * This method is wrapped in a try-catch so that delivery creation
+     * failures NEVER block order approval.
      */
     private void createAvailableDelivery(Order order) {
-        // Check if a delivery already exists for this order.
-        com.distributrack.entity.Delivery existing =
-                deliveryRepository.findByOrder(order).orElse(null);
-        if (existing != null) {
-            return; // Already has a delivery record.
+        try {
+            // Check if a delivery already exists for this order.
+            com.distributrack.entity.Delivery existing =
+                    deliveryRepository.findByOrder(order).orElse(null);
+            if (existing != null) {
+                return; // Already has a delivery record.
+            }
+
+            // Use the shopkeeper's address as the default delivery address.
+            String deliveryAddress = order.getShopkeeper().getAddress() != null
+                    ? order.getShopkeeper().getAddress()
+                    : order.getShopkeeper().getFullName();
+
+            com.distributrack.entity.Delivery delivery =
+                    com.distributrack.entity.Delivery.builder()
+                            .order(order)
+                            .deliveryStatus(com.distributrack.enums.DeliveryStatus.AVAILABLE)
+                            .deliveryAddress(deliveryAddress)
+                            .build();
+
+            delivery = deliveryRepository.save(delivery);
+
+            auditService.log("DELIVERY_CREATE_AVAILABLE", "Delivery", delivery.getId(),
+                    "Available delivery created for order " + order.getOrderNumber());
+
+            // Try automatic assignment to an eligible worker.
+            tryAutomaticAssignment(delivery);
+
+        } catch (Exception e) {
+            // Delivery creation should never block order approval.
+            // Log the error and continue — the order is still APPROVED.
+            log.error("Failed to create delivery for order {}: {}",
+                    order.getOrderNumber(), e.getMessage());
+        }
+    }
+
+    /**
+     * Attempts to automatically assign an AVAILABLE delivery to the
+     * least-recently-assigned eligible worker. Called during order approval.
+     *
+     * Eligible workers:
+     * - Role = DELIVERY_BOY
+     * - Account enabled
+     * - Availability = AVAILABLE (not BUSY or OFFLINE)
+     *
+     * Fair strategy: least-recently-assigned (oldest assignedAt first).
+     * If nobody is available, the delivery stays AVAILABLE for manual
+     * acceptance by workers.
+     */
+    private void tryAutomaticAssignment(com.distributrack.entity.Delivery delivery) {
+
+        // Find the least-recently-assigned AVAILABLE worker.
+        // Workers with null assignedAt (never assigned) are prioritized first.
+        List<User> eligibleWorkers = userRepository
+                .findByRole_Name(RoleName.DELIVERY_BOY)
+                .stream()
+                .filter(User::getEnabled)
+                .filter(w -> w.getAvailability() == WorkerAvailability.AVAILABLE)
+                .toList();
+
+        if (eligibleWorkers.isEmpty()) {
+            log.info("No available delivery workers for order {}",
+                    delivery.getOrder().getOrderNumber());
+            return;
         }
 
-        // Use the shopkeeper's address as the default delivery address.
-        String deliveryAddress = order.getShopkeeper().getAddress() != null
-                ? order.getShopkeeper().getAddress()
-                : order.getShopkeeper().getFullName();
+        // Select the least-recently-assigned worker by checking their
+        // most recent delivery's assignedAt timestamp.
+        User selectedWorker = null;
+        java.time.LocalDateTime latestAssignment = null;
 
-        com.distributrack.entity.Delivery delivery =
-                com.distributrack.entity.Delivery.builder()
-                        .order(order)
-                        .deliveryStatus(com.distributrack.enums.DeliveryStatus.AVAILABLE)
-                        .deliveryAddress(deliveryAddress)
-                        .build();
+        for (User worker : eligibleWorkers) {
+            List<com.distributrack.entity.Delivery> workerDeliveries =
+                    deliveryRepository.findByDeliveryBoy(worker);
 
+            if (workerDeliveries.isEmpty()) {
+                // Never assigned — highest priority.
+                selectedWorker = worker;
+                break;
+            }
+
+            // Find their most recent assignment time.
+            java.time.LocalDateTime mostRecent = workerDeliveries.stream()
+                    .map(d -> d.getAssignedAt() != null ? d.getAssignedAt()
+                            : d.getAvailableAt() != null ? d.getAvailableAt()
+                            : java.time.LocalDateTime.MIN)
+                    .max(java.time.LocalDateTime::compareTo)
+                    .orElse(java.time.LocalDateTime.MIN);
+
+            if (latestAssignment == null || mostRecent.isBefore(latestAssignment)) {
+                latestAssignment = mostRecent;
+                selectedWorker = worker;
+            }
+        }
+
+        if (selectedWorker == null) {
+            return;
+        }
+
+        // Assign the delivery.
+        delivery.setDeliveryBoy(selectedWorker);
+        delivery.setDeliveryStatus(com.distributrack.enums.DeliveryStatus.ASSIGNED);
+        delivery.setAssignedAt(java.time.LocalDateTime.now());
         deliveryRepository.save(delivery);
 
-        auditService.log("DELIVERY_CREATE_AVAILABLE", "Delivery", null,
-                "Available delivery created for order " + order.getOrderNumber());
+        // Mark worker as BUSY.
+        selectedWorker.setAvailability(WorkerAvailability.BUSY);
+        userRepository.save(selectedWorker);
+
+        // Sync order lifecycle.
+        delivery.getOrder().transitionTo(OrderStatus.ASSIGNED);
+        orderRepository.save(delivery.getOrder());
+
+        notificationService.notifyDeliveryAssigned(delivery);
+
+        auditService.log("DELIVERY_AUTO_ASSIGN", "Delivery", delivery.getId(),
+                "Order " + delivery.getOrder().getOrderNumber()
+                        + " auto-assigned to " + selectedWorker.getFullName());
+
+        log.info("Auto-assigned order {} to worker {}",
+                delivery.getOrder().getOrderNumber(),
+                selectedWorker.getFullName());
     }
 
     @Override

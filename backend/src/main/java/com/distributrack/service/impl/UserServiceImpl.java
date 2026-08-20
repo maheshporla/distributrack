@@ -6,6 +6,7 @@ import com.distributrack.dto.response.UserResponse;
 import com.distributrack.entity.Role;
 import com.distributrack.entity.User;
 import com.distributrack.enums.RoleName;
+import com.distributrack.enums.WorkerAvailability;
 import com.distributrack.repository.RoleRepository;
 import com.distributrack.repository.UserRepository;
 import com.distributrack.security.CurrentUserService;
@@ -22,8 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
-
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -298,6 +299,7 @@ public class UserServiceImpl implements UserService {
                 .vehicleNumber(user.getVehicleNumber())
                 .role(user.getRole().getName())
                 .enabled(user.getEnabled())
+                .availability(user.getAvailability())
                 .emailNotificationsEnabled(user.getEmailNotificationsEnabled())
                 .smsNotificationsEnabled(user.getSmsNotificationsEnabled())
                 .createdAt(user.getCreatedAt())
@@ -401,5 +403,88 @@ public class UserServiceImpl implements UserService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    // --- Worker Availability ---
+
+    @Override
+    public UserResponse toggleAvailability(WorkerAvailability targetAvailability) {
+
+        User current = currentUserService.getCurrentUser();
+
+        if (current.getRole().getName() != RoleName.DELIVERY_BOY) {
+            throw new RuntimeException("Only delivery workers can change availability");
+        }
+
+        if (!Boolean.TRUE.equals(current.getEnabled())) {
+            throw new RuntimeException("Your account is disabled");
+        }
+
+        // Workers can only toggle between AVAILABLE and OFFLINE.
+        // BUSY is controlled by the delivery system.
+        if (targetAvailability != WorkerAvailability.AVAILABLE
+                && targetAvailability != WorkerAvailability.OFFLINE) {
+            throw new RuntimeException(
+                    "Workers can only set availability to AVAILABLE or OFFLINE");
+        }
+
+        // Cannot go AVAILABLE if currently BUSY with an active delivery.
+        if (targetAvailability == WorkerAvailability.AVAILABLE
+                && current.getAvailability() == WorkerAvailability.BUSY) {
+            throw new RuntimeException(
+                    "Cannot go online while you have an active delivery");
+        }
+
+        current.setAvailability(targetAvailability);
+        current = userRepository.save(current);
+
+        auditService.log("WORKER_AVAILABILITY", "User", current.getId(),
+                "Availability changed to " + targetAvailability);
+
+        log.info("Worker {} availability changed to {}",
+                current.getEmail(), targetAvailability);
+
+        return mapToResponse(current);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> getDeliveryBoyStatistics() {
+
+        User current = currentUserService.getCurrentUser();
+        RoleName actorRole = current.getRole().getName();
+
+        if (actorRole != RoleName.SUPER_ADMIN
+                && actorRole != RoleName.OWNER
+                && actorRole != RoleName.MANAGER) {
+            throw new RuntimeException("Only admin/owner/manager can view delivery boy statistics");
+        }
+
+        List<User> allWorkers = userRepository.findByRole_Name(RoleName.DELIVERY_BOY);
+
+        long total = allWorkers.size();
+        long available = allWorkers.stream()
+                .filter(u -> u.getEnabled()
+                        && u.getAvailability() == WorkerAvailability.AVAILABLE)
+                .count();
+        long busy = allWorkers.stream()
+                .filter(u -> u.getEnabled()
+                        && u.getAvailability() == WorkerAvailability.BUSY)
+                .count();
+        long offline = allWorkers.stream()
+                .filter(u -> u.getEnabled()
+                        && u.getAvailability() == WorkerAvailability.OFFLINE)
+                .count();
+        long pending = allWorkers.stream()
+                .filter(u -> !Boolean.TRUE.equals(u.getEnabled()))
+                .count();
+
+        return Map.of(
+                "total", total,
+                "available", available,
+                "busy", busy,
+                "offline", offline,
+                "pendingApplications", pending
+        );
     }
 }

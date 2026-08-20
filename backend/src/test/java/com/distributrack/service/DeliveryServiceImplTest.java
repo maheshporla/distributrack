@@ -8,6 +8,7 @@ import com.distributrack.entity.User;
 import com.distributrack.enums.DeliveryStatus;
 import com.distributrack.enums.OrderStatus;
 import com.distributrack.enums.RoleName;
+import com.distributrack.enums.WorkerAvailability;
 import com.distributrack.repository.DeliveryRepository;
 import com.distributrack.repository.OrderRepository;
 import com.distributrack.repository.UserRepository;
@@ -449,5 +450,117 @@ class DeliveryServiceImplTest {
 
         assertThrows(RuntimeException.class,
                 () -> deliveryService.emergencyReassign(9L));
+    }
+
+    // ------------------------------------------------------------------
+    // Worker availability transition tests
+    // ------------------------------------------------------------------
+
+    @Test
+    void workerBecomesBusyAfterAcceptingDelivery() {
+
+        boy.setEnabled(true);
+        boy.setAvailability(WorkerAvailability.AVAILABLE);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        Delivery delivery = Delivery.builder()
+                .id(9L)
+                .order(Order.builder()
+                        .id(5L).orderNumber("ORD-TEST")
+                        .shopkeeper(shopkeeper)
+                        .totalAmount(BigDecimal.valueOf(1000))
+                        .status(OrderStatus.APPROVED)
+                        .build())
+                .deliveryStatus(DeliveryStatus.AVAILABLE)
+                .deliveryAddress("Test Address")
+                .build();
+
+        when(deliveryRepository.findByIdWithLock(9L)).thenReturn(Optional.of(delivery));
+
+        deliveryService.acceptDelivery(9L);
+
+        // Worker should now be BUSY.
+        assertEquals(WorkerAvailability.BUSY, boy.getAvailability());
+        verify(userRepository).save(boy);
+    }
+
+    @Test
+    void workerBecomesAvailableAfterDeliveryCompleted() {
+
+        boy.setEnabled(true);
+        boy.setAvailability(WorkerAvailability.BUSY);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
+        when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
+        // No other active deliveries.
+        when(deliveryRepository.findByDeliveryBoy(boy)).thenReturn(List.of(delivery));
+
+        deliveryService.updateDeliveryStatus(9L, "DELIVERED", null);
+
+        // Worker should be set back to AVAILABLE (no other active deliveries).
+        assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
+        verify(userRepository).save(boy);
+    }
+
+    @Test
+    void workerStaysBusyIfOtherActiveDeliveriesExist() {
+
+        boy.setEnabled(true);
+        boy.setAvailability(WorkerAvailability.BUSY);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
+        delivery.setId(9L);
+        when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
+
+        // Worker has another active delivery.
+        Delivery otherDelivery = deliveryFor(boy, DeliveryStatus.ASSIGNED, OrderStatus.ASSIGNED);
+        otherDelivery.setId(20L);
+        when(deliveryRepository.findByDeliveryBoy(boy))
+                .thenReturn(List.of(delivery, otherDelivery));
+
+        deliveryService.updateDeliveryStatus(9L, "DELIVERED", null);
+
+        // Worker should stay BUSY because they have another active delivery.
+        assertEquals(WorkerAvailability.BUSY, boy.getAvailability());
+    }
+
+    @Test
+    void workerBecomesAvailableAfterFailedDelivery() {
+
+        boy.setEnabled(true);
+        boy.setAvailability(WorkerAvailability.BUSY);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
+        when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
+        when(deliveryRepository.findByDeliveryBoy(boy)).thenReturn(List.of(delivery));
+
+        deliveryService.updateDeliveryStatus(9L, "FAILED", "No access");
+
+        assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
+    }
+
+    @Test
+    void workerFreedAfterEmergencyReassign() {
+
+        boy.setAvailability(WorkerAvailability.BUSY);
+        User manager = User.builder()
+                .id(10L).fullName("Manager")
+                .email("mgr@test.com")
+                .role(new Role(3L, RoleName.MANAGER))
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(manager);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.ASSIGNED, OrderStatus.ASSIGNED);
+        when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
+        // No other active deliveries for this worker.
+        when(deliveryRepository.findByDeliveryBoy(boy)).thenReturn(List.of(delivery));
+
+        deliveryService.emergencyReassign(9L);
+
+        // Previous worker should be freed.
+        assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
     }
 }

@@ -4,12 +4,14 @@ import com.distributrack.dto.request.CreateUserRequest;
 import com.distributrack.dto.request.UpdateUserRequest;
 import com.distributrack.dto.response.UserResponse;
 import com.distributrack.enums.RoleName;
+import com.distributrack.enums.WorkerAvailability;
 import com.distributrack.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Staff / customer account management.
@@ -74,5 +76,20 @@ public class UserController {
     @PutMapping("/delivery-applications/{id}/reject")
     public UserResponse rejectDeliveryApplication(@PathVariable Long id) {
         return userService.rejectDeliveryApplication(id);
+    }
+
+    // --- Worker Availability ---
+
+    @PutMapping("/availability")
+    public UserResponse toggleAvailability(
+            @RequestParam WorkerAvailability availability) {
+        return userService.toggleAvailability(availability);
+    }
+
+    // --- Delivery Boy Statistics ---
+
+    @GetMapping("/delivery-boy-stats")
+    public Map<String, Object> getDeliveryBoyStatistics() {
+        return userService.getDeliveryBoyStatistics();
     }
 }

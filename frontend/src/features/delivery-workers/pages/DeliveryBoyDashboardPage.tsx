@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   CheckCircle2,
@@ -10,6 +10,8 @@ import {
   Truck,
   XCircle,
   ArrowRight,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +23,10 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 import { deliveryService } from "@/services/api/deliveryService";
+import {
+  workerService,
+  type WorkerAvailability,
+} from "@/services/api/workerService";
 import { ROUTES as DELIVERY_ROUTES } from "@/constants/routes.constants";
 import { useAuthStore } from "@/store/authStore";
 import { DELIVERY_STATUS_META } from "@/features/deliveries/deliveryStatus";
@@ -28,6 +34,7 @@ import { ROUTES } from "@/constants/routes.constants";
 import type { Delivery } from "@/types/delivery.types";
 import { cn } from "@/lib/utils";
 import { formatDateTime, formatINR } from "@/lib/formatters";
+import { toast } from "sonner";
 
 /**
  * Dedicated dashboard for DELIVERY_BOY users landing at /delivery/dashboard.
@@ -37,32 +44,59 @@ import { formatDateTime, formatINR } from "@/lib/formatters";
  */
 export function DeliveryBoyDashboardPage() {
   const user = useAuthStore((state) => state.user);
+  // Uses `toast` from sonner imported above.
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [availableCount, setAvailableCount] = useState(0);
-  const [isOnline, setIsOnline] = useState(false);
+  const [availability, setAvailability] =
+    useState<WorkerAvailability>("OFFLINE");
+  const [togglingAvailability, setTogglingAvailability] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setLoadError(null);
+      const [myDeliveries, available] = await Promise.all([
+        deliveryService.getAllDeliveries(),
+        deliveryService.getAvailableDeliveries(),
+      ]);
+      setDeliveries(myDeliveries);
+      setAvailableCount(available.length);
+    } catch (error) {
+      console.error(error);
+      setLoadError("Failed to load dashboard data");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        setLoadError(null);
-        const [myDeliveries, available] = await Promise.all([
-          deliveryService.getAllDeliveries(),
-          deliveryService.getAvailableDeliveries(),
-        ]);
-        setDeliveries(myDeliveries);
-        setAvailableCount(available.length);
-      } catch (error) {
-        console.error(error);
-        setLoadError("Failed to load dashboard data");
-      } finally {
-        setIsLoading(false);
-      }
-    };
     loadData();
-  }, []);
+  }, [loadData]);
+
+  const handleToggleAvailability = async (
+    target: WorkerAvailability,
+  ) => {
+    setTogglingAvailability(true);
+    try {
+      const response = await workerService.setAvailability(target);
+      setAvailability(response.availability);
+      toast(
+        response.availability === "AVAILABLE"
+          ? "Now ONLINE — you can receive new delivery assignments."
+          : response.availability === "OFFLINE"
+            ? "Now OFFLINE — you will not receive new deliveries."
+            : "Now BUSY — currently handling a delivery.",
+      );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to update availability";
+      toast.error(message);
+    } finally {
+      setTogglingAvailability(false);
+    }
+  };
 
   // --- Derived stats ---
   const stats = useMemo(() => {
@@ -142,11 +176,14 @@ export function DeliveryBoyDashboardPage() {
         <ErrorState
           title="Failed to load dashboard"
           description={loadError}
-          onRetry={() => window.location.reload()}
+          onRetry={loadData}
         />
       </div>
     );
   }
+
+  const isOnline = availability === "AVAILABLE";
+  const isBusy = availability === "BUSY";
 
   return (
     <div className="space-y-6">
@@ -177,25 +214,45 @@ export function DeliveryBoyDashboardPage() {
           <span
             className={cn(
               "inline-block size-2.5 rounded-full",
-              isOnline ? "bg-green-500" : "bg-muted-foreground/40",
+              isOnline ? "bg-green-500" : isBusy ? "bg-amber-500" : "bg-muted-foreground/40",
             )}
           />
           <span className="text-sm font-medium">
-            {isOnline ? "ONLINE" : "OFFLINE"}
+            {isOnline ? "ONLINE" : isBusy ? "BUSY" : "OFFLINE"}
           </span>
         </div>
-        <Button
-          variant={isOnline ? "outline" : "default"}
-          size="sm"
-          onClick={() => setIsOnline(!isOnline)}
-        >
-          {isOnline ? "Go Offline" : "Go Online"}
-        </Button>
+        {isBusy ? (
+          <Badge variant="secondary" className="text-xs">
+            Currently delivering
+          </Badge>
+        ) : (
+          <Button
+            variant={isOnline ? "outline" : "default"}
+            size="sm"
+            disabled={togglingAvailability}
+            onClick={() =>
+              handleToggleAvailability(isOnline ? "OFFLINE" : "AVAILABLE")
+            }
+          >
+            {isOnline ? (
+              <>
+                <WifiOff className="mr-1 h-3.5 w-3.5" />
+                Go Offline
+              </>
+            ) : (
+              <>
+                <Wifi className="mr-1 h-3.5 w-3.5" />
+                Go Online
+              </>
+            )}
+          </Button>
+        )}
         <p className="text-xs text-muted-foreground">
           {isOnline
             ? "You can see and accept available deliveries."
-            : "Go online to see available deliveries."
-          }
+            : isBusy
+              ? "Complete your current delivery before going offline."
+              : "Go online to see available deliveries."}
         </p>
       </div>
 

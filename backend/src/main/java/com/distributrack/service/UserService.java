@@ -4,8 +4,10 @@ import com.distributrack.dto.request.CreateUserRequest;
 import com.distributrack.dto.request.UpdateUserRequest;
 import com.distributrack.dto.response.UserResponse;
 import com.distributrack.enums.RoleName;
+import com.distributrack.enums.WorkerAvailability;
 
 import java.util.List;
+import java.util.Map;
 
 public interface UserService {
 
@@ -42,4 +44,12 @@ public interface UserService {
 
     /** Reject a pending delivery partner: keep disabled, mark rejected. */
     UserResponse rejectDeliveryApplication(Long userId);
+
+    // --- Worker Availability ---
+
+    /** Toggle the worker's availability between AVAILABLE and OFFLINE. */
+    UserResponse toggleAvailability(WorkerAvailability targetAvailability);
+
+    /** Admin dashboard: delivery boy statistics. */
+    Map<String, Object> getDeliveryBoyStatistics();
 }

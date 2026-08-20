@@ -8,6 +8,7 @@ import com.distributrack.entity.User;
 import com.distributrack.enums.DeliveryStatus;
 import com.distributrack.enums.OrderStatus;
 import com.distributrack.enums.RoleName;
+import com.distributrack.enums.WorkerAvailability;
 import com.distributrack.repository.DeliveryRepository;
 import com.distributrack.repository.OrderRepository;
 import com.distributrack.repository.UserRepository;
@@ -167,6 +168,14 @@ public class DeliveryServiceImpl implements DeliveryService {
         }
 
         delivery = deliveryRepository.save(delivery);
+
+        // When a delivery ends (DELIVERED/FAILED/CANCELLED), check if the
+        // worker has other active deliveries. If not, set them back to AVAILABLE.
+        if (nextStatus == DeliveryStatus.DELIVERED
+                || nextStatus == DeliveryStatus.FAILED
+                || nextStatus == DeliveryStatus.CANCELLED) {
+            refreshWorkerAvailability(delivery.getDeliveryBoy());
+        }
 
         // Notify the shopkeeper about the delivery status.
         switch (nextStatus) {
@@ -362,6 +371,10 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         delivery = deliveryRepository.save(delivery);
 
+        // Mark worker as BUSY.
+        current.setAvailability(WorkerAvailability.BUSY);
+        userRepository.save(current);
+
         // Sync order lifecycle.
         delivery.getOrder().transitionTo(OrderStatus.ASSIGNED);
         orderRepository.save(delivery.getOrder());
@@ -406,6 +419,9 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         delivery = deliveryRepository.save(delivery);
 
+        // Free the previous worker if they have no other active deliveries.
+        refreshWorkerAvailability(previousWorker);
+
         // Sync order lifecycle — order goes back to APPROVED.
         delivery.getOrder().transitionTo(OrderStatus.APPROVED);
         orderRepository.save(delivery.getOrder());
@@ -417,6 +433,33 @@ public class DeliveryServiceImpl implements DeliveryService {
                         + " by " + current.getFullName());
 
         return mapToResponse(delivery);
+    }
+
+    /**
+     * After a delivery ends, check if the worker has other active
+     * (ASSIGNED/OUT_FOR_DELIVERY) deliveries. If not, set them
+     * back to AVAILABLE so they can receive new assignments.
+     */
+    private void refreshWorkerAvailability(User worker) {
+        if (worker == null) {
+            return;
+        }
+
+        List<Delivery> activeDeliveries = deliveryRepository.findByDeliveryBoy(worker)
+                .stream()
+                .filter(d -> d.getDeliveryStatus() == DeliveryStatus.ASSIGNED
+                        || d.getDeliveryStatus() == DeliveryStatus.OUT_FOR_DELIVERY)
+                .toList();
+
+        if (activeDeliveries.isEmpty()
+                && worker.getAvailability() == WorkerAvailability.BUSY) {
+            worker.setAvailability(WorkerAvailability.AVAILABLE);
+            userRepository.save(worker);
+
+            auditService.log("WORKER_AVAILABILITY", "User", worker.getId(),
+                    "Worker " + worker.getFullName()
+                            + " set back to AVAILABLE (no active deliveries)");
+        }
     }
 
     private DeliveryResponse mapToResponse(Delivery delivery) {
