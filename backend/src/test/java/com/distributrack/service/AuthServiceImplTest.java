@@ -198,17 +198,13 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void forgotPasswordExpiresOldTokenAndCreatesNew() {
+    void forgotPasswordDeletesOldTokenAndCreatesNew() {
 
         User user = testUser();
-        PasswordResetToken oldToken = PasswordResetToken.builder()
-                .id(1L).token("old-token").user(user)
-                .expiryDate(LocalDateTime.now().plusMinutes(10)).build();
 
         when(userRepository.findByEmail("test@test.com"))
                 .thenReturn(Optional.of(user));
-        when(passwordResetTokenRepository.findByUserId(10L))
-                .thenReturn(Optional.of(oldToken));
+        when(passwordResetTokenRepository.deleteByUserId(10L)).thenReturn(1);
         when(passwordResetTokenRepository.save(any(PasswordResetToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -217,27 +213,19 @@ class AuthServiceImplTest {
 
         authService.forgotPassword(request);
 
-        // Old token expired (not deleted) + new token saved = 2 saves total
-        verify(passwordResetTokenRepository, times(2)).save(any(PasswordResetToken.class));
-        // Old token expiry set to the past
-        assertTrue(oldToken.getExpiryDate().isBefore(LocalDateTime.now()));
+        // Old token deleted, new one saved
+        verify(passwordResetTokenRepository).deleteByUserId(10L);
+        verify(passwordResetTokenRepository).save(any(PasswordResetToken.class));
     }
 
     @Test
-    void forgotPasswordSecondRequestInvalidatesFirstToken() {
+    void forgotPasswordSecondRequestDeletesFirstToken() {
 
         User user = testUser();
-        PasswordResetToken firstToken = PasswordResetToken.builder()
-                .id(1L).token("first-token").user(user)
-                .expiryDate(LocalDateTime.now().plusMinutes(10)).build();
-        PasswordResetToken secondToken = PasswordResetToken.builder()
-                .id(2L).token("second-token").user(user)
-                .expiryDate(LocalDateTime.now().plusMinutes(10)).build();
 
         when(userRepository.findByEmail("test@test.com"))
                 .thenReturn(Optional.of(user));
-        when(passwordResetTokenRepository.findByUserId(10L))
-                .thenReturn(Optional.of(firstToken));
+        when(passwordResetTokenRepository.deleteByUserId(10L)).thenReturn(1);
         when(passwordResetTokenRepository.save(any(PasswordResetToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -246,10 +234,9 @@ class AuthServiceImplTest {
 
         authService.forgotPassword(request);
 
-        // First token expired
-        assertTrue(firstToken.getExpiryDate().isBefore(LocalDateTime.now()));
-        // Two saves: one for the expired firstToken, one for the new secondToken
-        verify(passwordResetTokenRepository, times(2)).save(any(PasswordResetToken.class));
+        // Old token deleted, new one created
+        verify(passwordResetTokenRepository).deleteByUserId(10L);
+        verify(passwordResetTokenRepository, times(1)).save(any(PasswordResetToken.class));
     }
 
     @Test
@@ -293,8 +280,7 @@ class AuthServiceImplTest {
 
         when(userRepository.findByEmail("test@test.com"))
                 .thenReturn(Optional.of(testUser()));
-        when(passwordResetTokenRepository.findByUserId(10L))
-                .thenReturn(Optional.empty());
+        when(passwordResetTokenRepository.deleteByUserId(10L)).thenReturn(0);
         when(passwordResetTokenRepository.save(any(PasswordResetToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 

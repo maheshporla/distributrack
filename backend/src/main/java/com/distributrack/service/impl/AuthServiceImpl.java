@@ -30,6 +30,7 @@ import com.distributrack.repository.PasswordResetTokenRepository;
 import com.distributrack.notification.EmailService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 import java.time.LocalDateTime;
@@ -182,6 +183,7 @@ public class AuthServiceImpl implements AuthService {
     private String frontendUrl;
 
     @Override
+    @Transactional
     public String forgotPassword(ForgotPasswordRequest request) {
 
         log.info("[FORGOT-PASSWORD] Password reset requested for email={}", request.getEmail());
@@ -198,15 +200,15 @@ public class AuthServiceImpl implements AuthService {
         User user = userOpt.get();
         log.info("[FORGOT-PASSWORD] User found: id={}, email={}", user.getId(), user.getEmail());
 
-        // Invalidate any old reset tokens by expiring them (do NOT delete —
-        // avoids DataIntegrityViolationException from cascade/orphanRemoval
-        // on the User entity's @OneToOne relationship).
-        passwordResetTokenRepository.findByUserId(user.getId())
-                .ifPresent(oldToken -> {
-                    oldToken.setExpiryDate(LocalDateTime.now().minusMinutes(1));
-                    passwordResetTokenRepository.save(oldToken);
-                    log.info("[FORGOT-PASSWORD] Old token invalidated for user={}", user.getId());
-                });
+        // Delete ALL old reset tokens for this user.
+        // The @OneToOne on user_id creates a UNIQUE constraint in MySQL,
+        // so we MUST remove the old row before inserting a new one.
+        // Wrapped in @Transactional to ensure atomicity.
+        int deleted = passwordResetTokenRepository
+                .deleteByUserId(user.getId());
+        if (deleted > 0) {
+            log.info("[FORGOT-PASSWORD] Deleted {} old token(s) for user={}", deleted, user.getId());
+        }
 
         String token = UUID.randomUUID().toString();
 
