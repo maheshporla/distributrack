@@ -45,6 +45,17 @@ public class SchemaInitializer implements CommandLineRunner {
             }
             rs.close();
 
+            // 3. Convert old BUSY values to AVAILABLE.
+            //    The BUSY enum was removed — workers can now handle multiple
+            //    simultaneous deliveries while staying AVAILABLE.
+            int updated = stmt.executeUpdate(
+                "UPDATE users SET availability = 'AVAILABLE' " +
+                "WHERE availability = 'BUSY'"
+            );
+            if (updated > 0) {
+                log.info("SchemaInitializer: converted {} BUSY workers to AVAILABLE", updated);
+            }
+
             log.info("SchemaInitializer: schema fixes applied successfully");
 
         } catch (Exception e) {

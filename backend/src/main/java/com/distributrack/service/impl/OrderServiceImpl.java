@@ -242,7 +242,7 @@ public class OrderServiceImpl implements OrderService {
      * Eligible workers:
      * - Role = DELIVERY_BOY
      * - Account enabled
-     * - Availability = AVAILABLE (not BUSY or OFFLINE)
+     * - Availability = AVAILABLE (not OFFLINE)
      *
      * Fair strategy: least-recently-assigned (oldest assignedAt first).
      * If nobody is available, the delivery stays AVAILABLE for manual

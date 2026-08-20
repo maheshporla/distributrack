@@ -37,7 +37,7 @@ public class UserResponse {
 
     private Boolean enabled;
 
-    /** Worker availability state (AVAILABLE/BUSY/OFFLINE). Null for non-worker roles. */
+    /** Worker availability state (AVAILABLE/OFFLINE). Null for non-worker roles. */
     private WorkerAvailability availability;
 
     /** Delivery partner: city of operation. Nullable. */
