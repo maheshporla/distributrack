@@ -100,8 +100,8 @@ export interface UserProfile {
   vehicleNumber?: string | null;
   role: RoleName;
   enabled: boolean;
-  /** Worker availability (AVAILABLE/BUSY/OFFLINE). Null for non-worker roles. */
-  availability?: "AVAILABLE" | "BUSY" | "OFFLINE";
+  /** Worker availability (AVAILABLE/OFFLINE). Null for non-worker roles. */
+  availability?: "AVAILABLE" | "OFFLINE";
   emailNotificationsEnabled?: boolean;
   smsNotificationsEnabled?: boolean;
   createdAt: string;

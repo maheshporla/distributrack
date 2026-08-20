@@ -457,7 +457,7 @@ class DeliveryServiceImplTest {
     // ------------------------------------------------------------------
 
     @Test
-    void workerBecomesBusyAfterAcceptingDelivery() {
+    void workerStaysAvailableAfterAcceptingDelivery() {
 
         boy.setEnabled(true);
         boy.setAvailability(WorkerAvailability.AVAILABLE);
@@ -479,73 +479,46 @@ class DeliveryServiceImplTest {
 
         deliveryService.acceptDelivery(9L);
 
-        // Worker should now be BUSY.
-        assertEquals(WorkerAvailability.BUSY, boy.getAvailability());
-        verify(userRepository).save(boy);
-    }
-
-    @Test
-    void workerBecomesAvailableAfterDeliveryCompleted() {
-
-        boy.setEnabled(true);
-        boy.setAvailability(WorkerAvailability.BUSY);
-        when(currentUserService.getCurrentUser()).thenReturn(boy);
-
-        Delivery delivery = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
-        when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
-        // No other active deliveries.
-        when(deliveryRepository.findByDeliveryBoy(boy)).thenReturn(List.of(delivery));
-
-        deliveryService.updateDeliveryStatus(9L, "DELIVERED", null);
-
-        // Worker should be set back to AVAILABLE (no other active deliveries).
+        // Worker stays AVAILABLE — can handle multiple deliveries.
         assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
-        verify(userRepository).save(boy);
     }
 
     @Test
-    void workerStaysBusyIfOtherActiveDeliveriesExist() {
+    void workerStaysAvailableAfterDeliveryCompleted() {
 
         boy.setEnabled(true);
-        boy.setAvailability(WorkerAvailability.BUSY);
+        boy.setAvailability(WorkerAvailability.AVAILABLE);
         when(currentUserService.getCurrentUser()).thenReturn(boy);
 
         Delivery delivery = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
-        delivery.setId(9L);
         when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
-
-        // Worker has another active delivery.
-        Delivery otherDelivery = deliveryFor(boy, DeliveryStatus.ASSIGNED, OrderStatus.ASSIGNED);
-        otherDelivery.setId(20L);
-        when(deliveryRepository.findByDeliveryBoy(boy))
-                .thenReturn(List.of(delivery, otherDelivery));
 
         deliveryService.updateDeliveryStatus(9L, "DELIVERED", null);
 
-        // Worker should stay BUSY because they have another active delivery.
-        assertEquals(WorkerAvailability.BUSY, boy.getAvailability());
+        // Worker stays AVAILABLE regardless.
+        assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
     }
 
     @Test
-    void workerBecomesAvailableAfterFailedDelivery() {
+    void workerStaysAvailableAfterFailedDelivery() {
 
         boy.setEnabled(true);
-        boy.setAvailability(WorkerAvailability.BUSY);
+        boy.setAvailability(WorkerAvailability.AVAILABLE);
         when(currentUserService.getCurrentUser()).thenReturn(boy);
 
         Delivery delivery = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
         when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
-        when(deliveryRepository.findByDeliveryBoy(boy)).thenReturn(List.of(delivery));
 
         deliveryService.updateDeliveryStatus(9L, "FAILED", "No access");
 
+        // Worker stays AVAILABLE regardless.
         assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
     }
 
     @Test
-    void workerFreedAfterEmergencyReassign() {
+    void workerStaysAvailableAfterEmergencyReassign() {
 
-        boy.setAvailability(WorkerAvailability.BUSY);
+        boy.setAvailability(WorkerAvailability.AVAILABLE);
         User manager = User.builder()
                 .id(10L).fullName("Manager")
                 .email("mgr@test.com")
@@ -555,12 +528,113 @@ class DeliveryServiceImplTest {
 
         Delivery delivery = deliveryFor(boy, DeliveryStatus.ASSIGNED, OrderStatus.ASSIGNED);
         when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
-        // No other active deliveries for this worker.
-        when(deliveryRepository.findByDeliveryBoy(boy)).thenReturn(List.of(delivery));
 
         deliveryService.emergencyReassign(9L);
 
-        // Previous worker should be freed.
+        // Worker stays AVAILABLE — can receive new assignments.
+        assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
+    }
+
+    // ------------------------------------------------------------------
+    // Multi-order assignment tests
+    // ------------------------------------------------------------------
+
+    @Test
+    void oneActiveWorkerCanAcceptMultipleDeliveries() {
+
+        boy.setEnabled(true);
+        boy.setAvailability(WorkerAvailability.AVAILABLE);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        // First delivery
+        Delivery d1 = Delivery.builder()
+                .id(1L)
+                .order(Order.builder()
+                        .id(10L).orderNumber("ORD-001")
+                        .shopkeeper(shopkeeper)
+                        .totalAmount(BigDecimal.valueOf(500))
+                        .status(OrderStatus.APPROVED).build())
+                .deliveryStatus(DeliveryStatus.AVAILABLE)
+                .deliveryAddress("Address 1").build();
+
+        when(deliveryRepository.findByIdWithLock(1L)).thenReturn(Optional.of(d1));
+        deliveryService.acceptDelivery(1L);
+
+        // Worker stays AVAILABLE after first acceptance.
+        assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
+
+        // Second delivery
+        Delivery d2 = Delivery.builder()
+                .id(2L)
+                .order(Order.builder()
+                        .id(11L).orderNumber("ORD-002")
+                        .shopkeeper(shopkeeper)
+                        .totalAmount(BigDecimal.valueOf(750))
+                        .status(OrderStatus.APPROVED).build())
+                .deliveryStatus(DeliveryStatus.AVAILABLE)
+                .deliveryAddress("Address 2").build();
+
+        when(deliveryRepository.findByIdWithLock(2L)).thenReturn(Optional.of(d2));
+        DeliveryResponse response = deliveryService.acceptDelivery(2L);
+
+        // Both deliveries accepted, worker still AVAILABLE.
+        assertEquals(DeliveryStatus.ASSIGNED, response.getDeliveryStatus());
+        assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
+    }
+
+    @Test
+    void sameWorkerCanAcceptFiveDeliveries() {
+
+        boy.setEnabled(true);
+        boy.setAvailability(WorkerAvailability.AVAILABLE);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        for (long i = 1; i <= 5; i++) {
+            Delivery d = Delivery.builder()
+                    .id(i)
+                    .order(Order.builder()
+                            .id(100L + i).orderNumber("ORD-" + i)
+                            .shopkeeper(shopkeeper)
+                            .totalAmount(BigDecimal.valueOf(100))
+                            .status(OrderStatus.APPROVED).build())
+                    .deliveryStatus(DeliveryStatus.AVAILABLE)
+                    .deliveryAddress("Address " + i).build();
+
+            when(deliveryRepository.findByIdWithLock(i)).thenReturn(Optional.of(d));
+            deliveryService.acceptDelivery(i);
+        }
+
+        // Worker stays AVAILABLE after accepting all 5.
+        assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
+    }
+
+    @Test
+    void workerWithExistingDeliveryCanAcceptNewOrder() {
+
+        boy.setEnabled(true);
+        boy.setAvailability(WorkerAvailability.AVAILABLE);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        // Existing assigned delivery.
+        Delivery existing = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
+        existing.setId(10L);
+
+        // New available delivery.
+        Delivery newDelivery = Delivery.builder()
+                .id(20L)
+                .order(Order.builder()
+                        .id(20L).orderNumber("ORD-NEW")
+                        .shopkeeper(shopkeeper)
+                        .totalAmount(BigDecimal.valueOf(300))
+                        .status(OrderStatus.APPROVED).build())
+                .deliveryStatus(DeliveryStatus.AVAILABLE)
+                .deliveryAddress("New Address").build();
+
+        when(deliveryRepository.findByIdWithLock(20L)).thenReturn(Optional.of(newDelivery));
+        DeliveryResponse response = deliveryService.acceptDelivery(20L);
+
+        // New delivery accepted while existing one is still active.
+        assertEquals(DeliveryStatus.ASSIGNED, response.getDeliveryStatus());
         assertEquals(WorkerAvailability.AVAILABLE, boy.getAvailability());
     }
 }

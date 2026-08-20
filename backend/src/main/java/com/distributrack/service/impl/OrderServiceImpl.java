@@ -304,9 +304,7 @@ public class OrderServiceImpl implements OrderService {
         delivery.setAssignedAt(java.time.LocalDateTime.now());
         deliveryRepository.save(delivery);
 
-        // Mark worker as BUSY.
-        selectedWorker.setAvailability(WorkerAvailability.BUSY);
-        userRepository.save(selectedWorker);
+        // Worker stays AVAILABLE — they can handle multiple deliveries.
 
         // Sync order lifecycle.
         delivery.getOrder().transitionTo(OrderStatus.ASSIGNED);

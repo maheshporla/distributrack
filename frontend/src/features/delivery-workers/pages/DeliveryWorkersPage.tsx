@@ -21,7 +21,6 @@ type PageView = "list" | "form";
 
 const AVAILABILITY_META: Record<string, { label: string; variant: "default" | "success" | "secondary" | "destructive" | "warning" }> = {
   AVAILABLE: { label: "Available", variant: "success" },
-  BUSY: { label: "Busy", variant: "warning" },
   OFFLINE: { label: "Offline", variant: "secondary" },
 };
 
@@ -187,7 +186,7 @@ export function DeliveryWorkersPage() {
 
       {/* --- Statistics Cards --- */}
       {stats && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             label="Total Delivery Boys"
             value={stats.total.toLocaleString()}
@@ -198,12 +197,6 @@ export function DeliveryWorkersPage() {
             label="Available Now"
             value={stats.available.toLocaleString()}
             icon={Activity}
-            isLoading={isLoading}
-          />
-          <StatCard
-            label="Busy"
-            value={stats.busy.toLocaleString()}
-            icon={Truck}
             isLoading={isLoading}
           />
           <StatCard

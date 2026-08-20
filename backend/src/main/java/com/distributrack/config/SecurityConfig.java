@@ -180,6 +180,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/delivery/*/accept")
                         .hasRole("DELIVERY_BOY")
 
+                        // COD cash collection: DELIVERY_BOY only (enforced in service).
+                        .requestMatchers(HttpMethod.POST, "/api/delivery/*/collect-cash")
+                        .hasRole("DELIVERY_BOY")
+
                         // Status + live location updates: DELIVERY_BOY for own
                         // deliveries only (enforced in service).
                         .requestMatchers(HttpMethod.PUT, "/api/delivery/**")
@@ -207,7 +211,7 @@ public class SecurityConfig {
                         // never trusted. SALESMAN is deliberately excluded.
                         // UPI initiation is also SHOPKEEPER-only (the admin
                         // verifies UPI payments via PUT /status).
-                        .requestMatchers(HttpMethod.POST, "/api/payments/initiate", "/api/payments/verify", "/api/payments/upi-initiate")
+                        .requestMatchers(HttpMethod.POST, "/api/payments/initiate", "/api/payments/verify", "/api/payments/upi-initiate", "/api/payments/cash-submit", "/api/payments/cod-submit")
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER", "SHOPKEEPER")
 
                         // Admin UPI verification: approve / reject payments.

@@ -37,7 +37,7 @@ export const PAYMENT_STATUSES = [
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-export const PAYMENT_CHANNELS = ["MANUAL", "GATEWAY", "MOCK", "UPI"] as const;
+export const PAYMENT_CHANNELS = ["MANUAL", "GATEWAY", "MOCK", "UPI", "CASH", "CASH_ON_DELIVERY"] as const;
 
 export type PaymentChannel = (typeof PAYMENT_CHANNELS)[number];
 
@@ -46,6 +46,8 @@ export const PAYMENT_CHANNEL_LABELS: Record<PaymentChannel, string> = {
   GATEWAY: "Online (Razorpay)",
   MOCK: "Online (Test Gateway)",
   UPI: "Direct UPI",
+  CASH: "Cash",
+  CASH_ON_DELIVERY: "Cash on Delivery",
 };
 
 /** UPI payment details returned by GET /api/payments/upi-details. */
@@ -136,7 +138,19 @@ export interface PaymentInitiationResponse {
 /** Matches UpiPaymentSubmitRequest.java. */
 export interface UpiPaymentSubmitPayload {
   orderId: number;
-  utr: string;
+  utr?: string;
+}
+
+/** Matches CashPaymentSubmitRequest.java. */
+export interface CashPaymentSubmitPayload {
+  orderId: number;
+  notes?: string;
+}
+
+/** Matches CodPaymentSubmitRequest.java. */
+export interface CodPaymentSubmitPayload {
+  orderId: number;
+  notes?: string;
 }
 
 /** Matches VerifyPaymentRequest.java. */

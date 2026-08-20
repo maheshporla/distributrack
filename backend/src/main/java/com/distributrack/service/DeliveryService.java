@@ -47,4 +47,10 @@ public interface DeliveryService {
      * Moves a delivery back to AVAILABLE so another worker can accept it.
      */
     DeliveryResponse emergencyReassign(Long deliveryId);
+
+    /**
+     * Delivery boy confirms cash collection for a COD order.
+     * Only the assigned delivery boy can perform this action.
+     */
+    DeliveryResponse confirmCashCollection(Long deliveryId);
 }

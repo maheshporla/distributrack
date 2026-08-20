@@ -108,4 +108,10 @@ public class DeliveryController {
     public DeliveryResponse emergencyReassign(@PathVariable Long id) {
         return deliveryService.emergencyReassign(id);
     }
+
+    // Delivery boy confirms cash collection for COD orders
+    @PostMapping("/{id}/collect-cash")
+    public DeliveryResponse confirmCashCollection(@PathVariable Long id) {
+        return deliveryService.confirmCashCollection(id);
+    }
 }

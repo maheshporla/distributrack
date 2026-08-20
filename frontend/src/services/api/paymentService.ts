@@ -8,6 +8,8 @@ import type {
   PaymentSummary,
   UpiDetails,
   UpiPaymentSubmitPayload,
+  CashPaymentSubmitPayload,
+  CodPaymentSubmitPayload,
   VerifyPaymentPayload,
 } from "@/types/payment.types";
 
@@ -110,7 +112,7 @@ export const paymentService = {
   },
 
   /**
-   * Shopkeeper submits UPI payment proof with UTR. Creates a
+   * Shopkeeper submits UPI payment. UTR is optional. Creates a
    * PENDING_VERIFICATION payment — admin must verify.
    */
   async submitUpiPayment(
@@ -118,6 +120,34 @@ export const paymentService = {
   ): Promise<Payment> {
     const response = await axiosInstance.post<Payment>(
       "/payments/upi-initiate",
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Shopkeeper submits cash payment claim. Creates a
+   * PENDING_VERIFICATION payment — admin must verify.
+   */
+  async submitCashPayment(
+    payload: CashPaymentSubmitPayload,
+  ): Promise<Payment> {
+    const response = await axiosInstance.post<Payment>(
+      "/payments/cash-submit",
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Shopkeeper selects Cash on Delivery as payment method.
+   * Creates a PENDING_VERIFICATION payment — delivery boy collects cash.
+   */
+  async submitCodPayment(
+    payload: CodPaymentSubmitPayload,
+  ): Promise<Payment> {
+    const response = await axiosInstance.post<Payment>(
+      "/payments/cod-submit",
       payload,
     );
     return response.data;

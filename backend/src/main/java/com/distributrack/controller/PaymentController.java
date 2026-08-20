@@ -1,5 +1,7 @@
 package com.distributrack.controller;
 
+import com.distributrack.dto.request.CashPaymentSubmitRequest;
+import com.distributrack.dto.request.CodPaymentSubmitRequest;
 import com.distributrack.dto.request.PaymentInitiationRequest;
 import com.distributrack.dto.request.PaymentRequest;
 import com.distributrack.dto.request.UpiPaymentSubmitRequest;
@@ -152,15 +154,36 @@ public class PaymentController {
     }
 
     /**
-     * Shopkeeper submits UPI payment proof with UTR. Creates a
-     * PENDING_VERIFICATION payment — admin must verify before marking
-     * as SUCCESS. The frontend cannot mark it as paid on its own.
+     * Shopkeeper submits UPI payment. UTR is optional. Creates a
+     * PENDING_VERIFICATION payment — admin must verify.
      */
     @PostMapping("/upi-initiate")
     public PaymentResponse submitUpiPayment(
             @Valid @RequestBody UpiPaymentSubmitRequest request) {
 
         return paymentService.submitUpiPayment(request);
+    }
+
+    /**
+     * Shopkeeper submits cash payment claim. Creates a
+     * PENDING_VERIFICATION payment — admin must verify.
+     */
+    @PostMapping("/cash-submit")
+    public PaymentResponse submitCashPayment(
+            @Valid @RequestBody CashPaymentSubmitRequest request) {
+
+        return paymentService.submitCashPayment(request);
+    }
+
+    /**
+     * Shopkeeper selects Cash on Delivery as payment method.
+     * Creates a PENDING_VERIFICATION payment — delivery boy collects cash.
+     */
+    @PostMapping("/cod-submit")
+    public PaymentResponse submitCodPayment(
+            @Valid @RequestBody CodPaymentSubmitRequest request) {
+
+        return paymentService.submitCodPayment(request);
     }
 
     // =========================================================

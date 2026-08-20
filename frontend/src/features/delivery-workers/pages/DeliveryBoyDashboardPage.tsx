@@ -85,9 +85,7 @@ export function DeliveryBoyDashboardPage() {
       toast(
         response.availability === "AVAILABLE"
           ? "Now ONLINE — you can receive new delivery assignments."
-          : response.availability === "OFFLINE"
-            ? "Now OFFLINE — you will not receive new deliveries."
-            : "Now BUSY — currently handling a delivery.",
+          : "Now OFFLINE — you will not receive new deliveries.",
       );
     } catch (error: unknown) {
       const message =
@@ -183,7 +181,6 @@ export function DeliveryBoyDashboardPage() {
   }
 
   const isOnline = availability === "AVAILABLE";
-  const isBusy = availability === "BUSY";
 
   return (
     <div className="space-y-6">
@@ -214,45 +211,37 @@ export function DeliveryBoyDashboardPage() {
           <span
             className={cn(
               "inline-block size-2.5 rounded-full",
-              isOnline ? "bg-green-500" : isBusy ? "bg-amber-500" : "bg-muted-foreground/40",
+              isOnline ? "bg-green-500" : "bg-muted-foreground/40",
             )}
           />
           <span className="text-sm font-medium">
-            {isOnline ? "ONLINE" : isBusy ? "BUSY" : "OFFLINE"}
+            {isOnline ? "ONLINE" : "OFFLINE"}
           </span>
         </div>
-        {isBusy ? (
-          <Badge variant="secondary" className="text-xs">
-            Currently delivering
-          </Badge>
-        ) : (
-          <Button
-            variant={isOnline ? "outline" : "default"}
-            size="sm"
-            disabled={togglingAvailability}
-            onClick={() =>
-              handleToggleAvailability(isOnline ? "OFFLINE" : "AVAILABLE")
-            }
-          >
-            {isOnline ? (
-              <>
-                <WifiOff className="mr-1 h-3.5 w-3.5" />
-                Go Offline
-              </>
-            ) : (
-              <>
-                <Wifi className="mr-1 h-3.5 w-3.5" />
-                Go Online
-              </>
-            )}
-          </Button>
-        )}
+        <Button
+          variant={isOnline ? "outline" : "default"}
+          size="sm"
+          disabled={togglingAvailability}
+          onClick={() =>
+            handleToggleAvailability(isOnline ? "OFFLINE" : "AVAILABLE")
+          }
+        >
+          {isOnline ? (
+            <>
+              <WifiOff className="mr-1 h-3.5 w-3.5" />
+              Go Offline
+            </>
+          ) : (
+            <>
+              <Wifi className="mr-1 h-3.5 w-3.5" />
+              Go Online
+            </>
+          )}
+        </Button>
         <p className="text-xs text-muted-foreground">
           {isOnline
-            ? "You can see and accept available deliveries."
-            : isBusy
-              ? "Complete your current delivery before going offline."
-              : "Go online to see available deliveries."}
+            ? "You can receive multiple delivery assignments simultaneously."
+            : "Go online to see available deliveries."}
         </p>
       </div>
 

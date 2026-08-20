@@ -77,4 +77,21 @@ public class DeliveryResponse {
     private LocalDateTime assignedAt;
 
     private LocalDateTime deliveredAt;
+
+    // --- Cash on Delivery collection tracking ---
+
+    /** Whether cash was collected by the delivery boy. */
+    private Boolean codCollected;
+
+    /** When the cash was collected. */
+    private LocalDateTime codCollectedAt;
+
+    /** Who collected the cash (delivery boy name). */
+    private String codCollectedByName;
+
+    /** The COD amount to collect. */
+    private BigDecimal codAmount;
+
+    /** Collection notes from the delivery boy. */
+    private String codCollectionNotes;
 }

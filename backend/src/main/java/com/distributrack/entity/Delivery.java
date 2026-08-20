@@ -77,6 +77,24 @@ public class Delivery {
     @Column
     private LocalDateTime deliveredAt;
 
+    // --- Cash on Delivery collection tracking ---
+
+    @Column(name = "cod_collected")
+    private Boolean codCollected = false;
+
+    @Column(name = "cod_collected_at")
+    private LocalDateTime codCollectedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cod_collected_by")
+    private User codCollectedBy;
+
+    @Column(name = "cod_amount", precision = 12, scale = 2)
+    private java.math.BigDecimal codAmount;
+
+    @Column(name = "cod_collection_notes", length = 500)
+    private String codCollectionNotes;
+
     @PrePersist
     public void prePersist() {
         if (deliveryStatus == null) {

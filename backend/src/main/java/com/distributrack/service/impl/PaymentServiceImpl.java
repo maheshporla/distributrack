@@ -1,6 +1,8 @@
 package com.distributrack.service.impl;
 
 import com.distributrack.config.DistributorProperties;
+import com.distributrack.dto.request.CashPaymentSubmitRequest;
+import com.distributrack.dto.request.CodPaymentSubmitRequest;
 import com.distributrack.dto.request.PaymentInitiationRequest;
 import com.distributrack.dto.request.PaymentRequest;
 import com.distributrack.dto.request.UpiPaymentSubmitRequest;
@@ -420,21 +422,23 @@ public class PaymentServiceImpl implements PaymentService {
             throw new IllegalStateException("Order " + order.getOrderNumber() + " is already fully paid");
         }
 
-        // Trim and validate the UTR.
-        String utr = request.getUtr().trim();
-        if (utr.length() < 6 || utr.length() > 32) {
-            throw new IllegalArgumentException("UTR must be between 6 and 32 characters");
-        }
-
-        // Prevent duplicate UTR submissions.
-        if (paymentRepository.existsByUtr(utr)) {
-            throw new IllegalArgumentException(
-                    "This UTR has already been submitted. Each UTR can only be used once."
-            );
+        // Validate UTR if provided (optional — no longer required).
+        String utr = null;
+        if (request.getUtr() != null && !request.getUtr().isBlank()) {
+            utr = request.getUtr().trim();
+            if (utr.length() < 6 || utr.length() > 32) {
+                throw new IllegalArgumentException("UTR must be between 6 and 32 characters");
+            }
+            // Prevent duplicate UTR submissions.
+            if (paymentRepository.existsByUtr(utr)) {
+                throw new IllegalArgumentException(
+                        "This UTR has already been submitted. Each UTR can only be used once."
+                );
+            }
         }
 
         // Create a PENDING_VERIFICATION payment — NOT auto-verified.
-        // Admin must verify the UTR against the bank statement.
+        // Admin must verify the payment.
         Payment payment = Payment.builder()
                 .order(order)
                 .amount(outstanding)
@@ -443,16 +447,124 @@ public class PaymentServiceImpl implements PaymentService {
                 .transactionId("UPI_" + UUID.randomUUID().toString().substring(0, 12))
                 .paymentChannel(PaymentChannel.UPI)
                 .utr(utr)
-                .notes("UPI payment submitted by shopkeeper — awaiting admin verification")
+                .notes(utr != null
+                        ? "UPI payment submitted by shopkeeper with UTR — awaiting admin verification"
+                        : "UPI payment submitted by shopkeeper — awaiting admin verification")
                 .build();
 
         payment = paymentRepository.save(payment);
 
         auditService.log("UPI_SUBMIT", "Payment", payment.getId(),
                 "UPI payment of " + payment.getAmount() + " submitted for order "
-                        + order.getOrderNumber() + " (UTR: " + utr + ") — pending verification");
+                        + order.getOrderNumber()
+                        + (utr != null ? " (UTR: " + utr + ")" : " (no UTR)")
+                        + " — pending verification");
 
         // Notify admin/distributor about the pending verification.
+        notificationService.notifyUpiPaymentSubmitted(payment);
+
+        return mapToResponse(payment);
+    }
+
+    // =========================================================
+    // Cash payment
+    // =========================================================
+
+    @Override
+    @Transactional
+    public PaymentResponse submitCashPayment(CashPaymentSubmitRequest request) {
+
+        User current = currentUserService.getCurrentUser();
+
+        // Only SHOPKEEPER may submit a cash payment.
+        if (current.getRole().getName() != RoleName.SHOPKEEPER) {
+            throw new IllegalStateException(
+                    "Only SHOPKEEPER accounts may submit cash payments."
+            );
+        }
+
+        Order order = findOrder(request.getOrderId());
+
+        assertCanPay(order, current);
+        assertDelivered(order);
+
+        BigDecimal outstanding = outstandingAmount(order);
+
+        if (outstanding.signum() <= 0) {
+            throw new IllegalStateException("Order " + order.getOrderNumber() + " is already fully paid");
+        }
+
+        // Create a PENDING_VERIFICATION payment — NOT auto-verified.
+        // Admin/distributor must verify the cash was received.
+        Payment payment = Payment.builder()
+                .order(order)
+                .amount(outstanding)
+                .paymentMethod("CASH")
+                .paymentStatus(PaymentStatus.PENDING_VERIFICATION)
+                .transactionId("CASH_" + UUID.randomUUID().toString().substring(0, 12))
+                .paymentChannel(PaymentChannel.CASH)
+                .notes(request.getNotes() != null && !request.getNotes().isBlank()
+                        ? request.getNotes().trim()
+                        : "Cash payment submitted by shopkeeper — awaiting verification")
+                .build();
+
+        payment = paymentRepository.save(payment);
+
+        auditService.log("CASH_SUBMIT", "Payment", payment.getId(),
+                "Cash payment of " + payment.getAmount() + " submitted for order "
+                        + order.getOrderNumber() + " — pending verification");
+
+        notificationService.notifyUpiPaymentSubmitted(payment);
+
+        return mapToResponse(payment);
+    }
+
+    // =========================================================
+    // Cash on Delivery payment
+    // =========================================================
+
+    @Override
+    @Transactional
+    public PaymentResponse submitCodPayment(CodPaymentSubmitRequest request) {
+
+        User current = currentUserService.getCurrentUser();
+
+        // Only SHOPKEEPER may select COD as a payment method.
+        if (current.getRole().getName() != RoleName.SHOPKEEPER) {
+            throw new IllegalStateException(
+                    "Only SHOPKEEPER accounts may select Cash on Delivery."
+            );
+        }
+
+        Order order = findOrder(request.getOrderId());
+
+        assertCanPay(order, current);
+        assertDelivered(order);
+
+        BigDecimal outstanding = outstandingAmount(order);
+
+        if (outstanding.signum() <= 0) {
+            throw new IllegalStateException("Order " + order.getOrderNumber() + " is already fully paid");
+        }
+
+        // Create a PENDING_VERIFICATION payment for COD.
+        // The actual collection happens by the delivery boy.
+        Payment payment = Payment.builder()
+                .order(order)
+                .amount(outstanding)
+                .paymentMethod("CASH_ON_DELIVERY")
+                .paymentStatus(PaymentStatus.PENDING_VERIFICATION)
+                .transactionId("COD_" + UUID.randomUUID().toString().substring(0, 12))
+                .paymentChannel(PaymentChannel.CASH_ON_DELIVERY)
+                .notes("Cash on Delivery selected — pending collection by delivery boy")
+                .build();
+
+        payment = paymentRepository.save(payment);
+
+        auditService.log("COD_SUBMIT", "Payment", payment.getId(),
+                "COD payment of " + payment.getAmount() + " submitted for order "
+                        + order.getOrderNumber() + " — pending collection by delivery boy");
+
         notificationService.notifyUpiPaymentSubmitted(payment);
 
         return mapToResponse(payment);

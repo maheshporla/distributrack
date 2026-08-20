@@ -1,21 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CreditCard, Loader2, ShieldCheck, Smartphone, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  CreditCard,
+  Loader2,
+  ShieldCheck,
+  Smartphone,
+  Banknote,
+  Truck,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import QRCode from "qrcode";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 import { paymentService } from "@/services/api/paymentService";
 
-import { Input } from "@/components/ui/input";
-
-import type {
-  Payment,
-  PaymentInitiationResponse,
-  UpiDetails,
-} from "@/types/payment.types";
+import type { Payment, UpiDetails } from "@/types/payment.types";
 import { formatINR } from "@/lib/formatters";
+
+type PaymentMethod = "upi" | "cash" | "cod";
 
 interface PaymentCheckoutProps {
   orderId: number;
@@ -26,18 +29,14 @@ interface PaymentCheckoutProps {
 }
 
 /**
- * Online payment flow. The backend decides the mode:
+ * Payment flow with three options: UPI, Cash, and Cash on Delivery.
  *
- *  - GATEWAY: the Razorpay checkout (test keys from the backend) opens in
- *    an iframe/dialog; the success callback posts razorpay order/payment
- *    id + signature to /api/payments/verify, which verifies the HMAC
- *    signature and re-fetches the payment from Razorpay before recording.
- *    The frontend can never mark a payment paid on its own.
+ * UPI: Shopkeeper scans QR, pays via any UPI app, clicks "I've Paid".
+ * Cash: Shopkeeper confirms they will pay cash to the distributor.
+ * COD: Payment is collected during delivery by the delivery boy.
  *
- *  - MOCK: the backend itself plays the gateway (development default).
- *    It issues the payment id + signature at initiation, and this dialog
- *    simply completes the simulated checkout with those values — the
- *    verify step validates the signature exactly like the real flow.
+ * All three methods create a PENDING_VERIFICATION payment — the backend
+ * never auto-marks as SUCCESS. Admin/distributor must verify.
  */
 export function PaymentCheckout({
   orderId,
@@ -46,139 +45,25 @@ export function PaymentCheckout({
   onSuccess,
   onClose,
 }: PaymentCheckoutProps) {
-  const [initiation, setInitiation] = useState<PaymentInitiationResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [verifying, setVerifying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const openedRef = useRef(false);
-  const [paymentMethod, setPaymentMethod] = useState<"razorpay" | "upi" | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(
+    null,
+  );
   const [upiDetails, setUpiDetails] = useState<UpiDetails | null>(null);
   const [upiQrDataUrl, setUpiQrDataUrl] = useState<string | null>(null);
-  const [upiInitiating, setUpiInitiating] = useState(false);
-  const [utr, setUtr] = useState("");
-  const [upiSubmitted, setUpiSubmitted] = useState(false);
+  const [loadingUpi, setLoadingUpi] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // ---------------------------------------------------------
-  // 1. Initiate the gateway order (nothing is recorded yet)
-  // ---------------------------------------------------------
-  useEffect(() => {
-    let cancelled = false;
-
-    paymentService
-      .initiateGatewayPayment({ orderId, amount })
-      .then((response) => {
-        if (cancelled) return;
-        setInitiation(response);
-        setLoading(false);
-      })
-      .catch((err: any) => {
-        if (cancelled) return;
-        setError(err?.message ?? "Failed to start payment");
-        setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [orderId, amount]);
-
-  // ---------------------------------------------------------
-  // 2. GATEWAY mode: open the Razorpay checkout
-  // ---------------------------------------------------------
-  const openRazorpayCheckout = useCallback(
-    (init: PaymentInitiationResponse) => {
-      const keyId = init.keyId;
-      if (!keyId) {
-        setError("Payment gateway is not configured (missing key id)");
-        return;
-      }
-
-      // Dynamically load the Razorpay checkout script (test/live keys
-      // come from the backend, never hardcoded in the frontend).
-      const loadScript = () =>
-        new Promise<void>((resolve, reject) => {
-          if ((window as any).Razorpay) {
-            resolve();
-            return;
-          }
-          const script = document.createElement("script");
-          script.src = "https://checkout.razorpay.com/v1/checkout.js";
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error("Failed to load Razorpay checkout"));
-          document.body.appendChild(script);
-        });
-
-      loadScript()
-        .then(() => {
-          const options = {
-            key: keyId,
-            amount: Math.round(init.amount * 100), // paise
-            currency: init.currency || "INR",
-            name: "DistribuTrack",
-            description: `Payment for order ${init.orderNumber}`,
-            order_id: init.gatewayOrderId,
-            handler: async (response: {
-              razorpay_payment_id: string;
-              razorpay_order_id: string;
-              razorpay_signature: string;
-            }) => {
-              try {
-                setVerifying(true);
-                const payment = await paymentService.verifyGatewayPayment({
-                  orderId: init.orderId,
-                  amount: init.amount,
-                  gatewayOrderId: response.razorpay_order_id,
-                  gatewayPaymentId: response.razorpay_payment_id,
-                  signature: response.razorpay_signature,
-                });
-                toast.success("Payment verified and recorded");
-                onSuccess(payment);
-              } catch (err: any) {
-                console.error(err);
-                toast.error(err?.message ?? "Payment verification failed");
-              } finally {
-                setVerifying(false);
-              }
-            },
-            modal: {
-              ondismiss: () => {
-                /* user closed the checkout — leave the order unpaid */
-              },
-            },
-            theme: { color: "#4f46e5" },
-          };
-
-          const rzp = new (window as any).Razorpay(options);
-          rzp.on("payment.failed", (_response: unknown) => {
-            toast.error("Payment failed. You can try again.");
-          });
-          rzp.open();
-        })
-        .catch((err: any) => {
-          console.error(err);
-          setError(err?.message ?? "Failed to load Razorpay checkout");
-        });
-    },
-    [onSuccess],
-  );
-
-  // Open the Razorpay checkout once the initiation returns.
-  useEffect(() => {
-    if (initiation && initiation.mode === "GATEWAY" && !openedRef.current) {
-      openedRef.current = true;
-      openRazorpayCheckout(initiation);
-    }
-  }, [initiation, openRazorpayCheckout]);
-
-  // ---------------------------------------------------------
-  // 3. UPI mode: fetch UPI details + generate QR
+  // Load UPI details when user selects UPI
   // ---------------------------------------------------------
   const loadUpiDetails = useCallback(async () => {
     try {
+      setLoadingUpi(true);
       const details = await paymentService.getUpiDetails(orderId);
       setUpiDetails(details);
 
-      // Generate QR code from the UPI URI
       const qrDataUrl = await QRCode.toDataURL(details.upiUri, {
         width: 256,
         margin: 2,
@@ -186,77 +71,112 @@ export function PaymentCheckout({
       });
       setUpiQrDataUrl(qrDataUrl);
     } catch (err: any) {
-      // The axios interceptor normalizes errors to { status, message, errors }
       setError(err?.message ?? "Failed to load UPI details");
+    } finally {
+      setLoadingUpi(false);
     }
   }, [orderId]);
 
-  const handleUpiPayment = async () => {
-    if (!initiation) return;
-    const trimmedUtr = utr.trim();
-    if (!trimmedUtr) {
-      toast.error("Please enter the UTR / Transaction ID from your UPI payment");
-      return;
+  useEffect(() => {
+    if (paymentMethod === "upi" && !upiDetails && !loadingUpi) {
+      loadUpiDetails();
     }
+  }, [paymentMethod, upiDetails, loadingUpi, loadUpiDetails]);
+
+  // ---------------------------------------------------------
+  // UPI: "I've Paid via UPI" — no UTR required
+  // ---------------------------------------------------------
+  const handleUpiSubmit = async () => {
     try {
-      setUpiInitiating(true);
-      await paymentService.submitUpiPayment({
-        orderId: initiation.orderId,
-        utr: trimmedUtr,
-      });
-      setUpiSubmitted(true);
-      toast.success("Payment submitted — waiting for admin verification");
+      setSubmitting(true);
+      await paymentService.submitUpiPayment({ orderId });
+      setSubmitted(true);
+      toast.success(
+        "Payment submitted successfully. It will be verified by the distributor.",
+      );
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to submit UPI payment");
     } finally {
-      setUpiInitiating(false);
+      setSubmitting(false);
     }
   };
 
-  // Load UPI details when the user selects UPI
-  useEffect(() => {
-    if (paymentMethod === "upi" && !upiDetails) {
-      loadUpiDetails();
-    }
-  }, [paymentMethod, upiDetails, loadUpiDetails]);
-
   // ---------------------------------------------------------
-  // 4. MOCK mode: complete the simulated checkout
+  // Cash: "Confirm Cash Payment"
   // ---------------------------------------------------------
-  const completeMockPayment = async () => {
-    if (!initiation) return;
+  const handleCashSubmit = async () => {
     try {
-      setVerifying(true);
-      const payment = await paymentService.verifyGatewayPayment({
-        orderId: initiation.orderId,
-        amount: initiation.amount,
-        gatewayOrderId: initiation.gatewayOrderId,
-        gatewayPaymentId: initiation.mockPaymentId!,
-        signature: initiation.mockSignature!,
-      });
-      toast.success("Test payment verified and recorded");
-      onSuccess(payment);
+      setSubmitting(true);
+      await paymentService.submitCashPayment({ orderId });
+      setSubmitted(true);
+      toast.success(
+        "Cash payment submitted. It will be verified by the distributor.",
+      );
     } catch (err: any) {
-      console.error(err);
-      toast.error(err?.message ?? "Payment verification failed");
+      toast.error(err?.message ?? "Failed to submit cash payment");
     } finally {
-      setVerifying(false);
+      setSubmitting(false);
     }
   };
 
-  const mock = initiation?.mode === "MOCK";
+  // ---------------------------------------------------------
+  // COD: "Confirm Cash on Delivery"
+  // ---------------------------------------------------------
+  const handleCodSubmit = async () => {
+    try {
+      setSubmitting(true);
+      await paymentService.submitCodPayment({ orderId });
+      setSubmitted(true);
+      toast.success(
+        "Cash on Delivery selected. The delivery boy will collect the payment.",
+      );
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to submit COD payment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ---------------------------------------------------------
+  // After submission: close on success
+  // ---------------------------------------------------------
+  const handleClose = () => {
+    if (submitted) {
+      // Refresh the page data by calling onSuccess with a dummy payment
+      onSuccess({
+        id: 0,
+        orderId,
+        orderNumber,
+        shopkeeperId: 0,
+        shopkeeperName: "",
+        orderTotalAmount: amount,
+        amount,
+        paymentMethod: paymentMethod === "upi" ? "UPI" : paymentMethod === "cash" ? "CASH" : "CASH_ON_DELIVERY",
+        paymentStatus: "PENDING_VERIFICATION",
+        paymentChannel: paymentMethod === "upi" ? "UPI" : paymentMethod === "cash" ? "CASH" : "CASH_ON_DELIVERY",
+        transactionId: "",
+        utr: null,
+        rejectionReason: null,
+        verifiedByName: null,
+        verifiedAt: null,
+        paymentDate: new Date().toISOString(),
+      });
+    }
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-xl border bg-card p-6 shadow-xl">
+        {/* Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Pay for {orderNumber}</h2>
           </div>
           <button
-            onClick={onClose}
-            disabled={verifying || loading}
+            onClick={handleClose}
+            disabled={submitting}
             className="rounded p-1 text-muted-foreground hover:bg-muted"
             aria-label="Close"
           >
@@ -264,149 +184,107 @@ export function PaymentCheckout({
           </button>
         </div>
 
-        {loading && (
-          <div className="flex flex-col items-center gap-3 py-10">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Starting secure payment…
-            </p>
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="py-6">
-            <p className="text-sm text-destructive">{error}</p>
-            <Button variant="outline" size="sm" className="mt-4" onClick={onClose}>
+        {/* Submitted state */}
+        {submitted && (
+          <div className="space-y-4 pt-4">
+            <div className="flex items-start gap-2 rounded-lg border border-green-400/40 bg-green-50 p-3 text-xs text-green-700 dark:border-green-400/30 dark:bg-green-950 dark:text-green-300">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                <strong>Payment submitted successfully.</strong>
+                <br />
+                {paymentMethod === "cod"
+                  ? "The delivery boy will collect the cash when your order is delivered."
+                  : "It will be verified by the distributor. You will be notified once verified."}
+              </p>
+            </div>
+            <Button variant="outline" className="w-full" onClick={handleClose}>
               Close
             </Button>
           </div>
         )}
 
-        {!loading && !error && initiation && !paymentMethod && (
+        {/* Method selection */}
+        {!submitted && !paymentMethod && (
           <div className="space-y-4 pt-4">
             <div className="rounded-lg border bg-muted/40 p-4">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Amount</span>
-                <span className="font-semibold">{formatINR(initiation.amount)}</span>
-              </div>
-              <div className="mt-2 flex justify-between text-sm">
-                <span className="text-muted-foreground">Order</span>
-                <span className="font-mono text-xs">{initiation.orderNumber}</span>
+                <span className="font-semibold">{formatINR(amount)}</span>
               </div>
             </div>
 
-            <p className="text-sm text-muted-foreground">Choose payment method:</p>
+            <p className="text-sm text-muted-foreground">
+              Choose payment method:
+            </p>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setPaymentMethod("razorpay")}
-                className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-primary hover:bg-primary/5"
-              >
-                <CreditCard className="h-6 w-6 text-primary" />
-                <span className="text-sm font-medium">Razorpay</span>
-                <span className="text-xs text-muted-foreground">Card / UPI / Netbanking</span>
-              </button>
-
+            <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={() => setPaymentMethod("upi")}
                 className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-primary hover:bg-primary/5"
               >
                 <Smartphone className="h-6 w-6 text-green-600" />
-                <span className="text-sm font-medium">Direct UPI</span>
-                <span className="text-xs text-muted-foreground">Scan QR / Pay via app</span>
+                <span className="text-sm font-medium">UPI</span>
+                <span className="text-xs text-muted-foreground">
+                  Scan QR / Pay
+                </span>
+              </button>
+
+              <button
+                onClick={() => setPaymentMethod("cash")}
+                className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <Banknote className="h-6 w-6 text-amber-600" />
+                <span className="text-sm font-medium">Cash</span>
+                <span className="text-xs text-muted-foreground">
+                  Pay in person
+                </span>
+              </button>
+
+              <button
+                onClick={() => setPaymentMethod("cod")}
+                className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <Truck className="h-6 w-6 text-blue-600" />
+                <span className="text-sm font-medium">COD</span>
+                <span className="text-xs text-muted-foreground">
+                  Pay on delivery
+                </span>
               </button>
             </div>
-          </div>
-        )}
 
-        {/* Razorpay path */}
-        {!loading && !error && initiation && paymentMethod === "razorpay" && (
-          <div className="space-y-4 pt-4">
-            <div className="rounded-lg border bg-muted/40 p-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Amount</span>
-                <span className="font-semibold">{formatINR(initiation.amount)}</span>
-              </div>
-              <div className="mt-2 flex justify-between text-sm">
-                <span className="text-muted-foreground">Gateway order</span>
-                <span className="font-mono text-xs">{initiation.gatewayOrderId}</span>
-              </div>
-            </div>
-
-            {mock ? (
-              <div className="space-y-3">
-                <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/5 p-3 text-xs text-warning">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>
-                    Test gateway (development mode) — no real money moves.
-                    The payment is still recorded through the backend's
-                    signature-verified flow.
-                  </p>
-                </div>
-
-                <Button
-                  className="w-full"
-                  onClick={completeMockPayment}
-                  disabled={verifying}
-                >
-                  {verifying ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying payment…
-                    </>
-                  ) : (
-                    "Complete Test Payment"
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">Razorpay checkout opening…</Badge>
-                {verifying && (
-                  <span className="text-xs text-muted-foreground">
-                    Verifying payment…
-                  </span>
-                )}
+            {/* Error */}
+            {error && (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+                {error}
               </div>
             )}
           </div>
         )}
 
         {/* UPI path */}
-        {!loading && !error && initiation && paymentMethod === "upi" && (
+        {!submitted && paymentMethod === "upi" && (
           <div className="space-y-4 pt-4">
-            {upiSubmitted ? (
-              <div className="space-y-4">
-                <div className="flex items-start gap-2 rounded-lg border border-green-400/40 bg-green-50 p-3 text-xs text-green-700 dark:border-green-400/30 dark:bg-green-950 dark:text-green-300">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>
-                    <strong>Payment submitted successfully.</strong><br />
-                    Waiting for admin verification. You will be notified once
-                    your payment is verified.
-                  </p>
-                </div>
-                <Button variant="outline" className="w-full" onClick={onClose}>
-                  Close
-                </Button>
+            {loadingUpi ? (
+              <div className="flex flex-col items-center gap-3 py-10">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Loading UPI details…
+                </p>
               </div>
             ) : upiDetails ? (
               <>
                 <div className="rounded-lg border bg-muted/40 p-4">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Amount</span>
-                    <span className="font-semibold">{formatINR(upiDetails.amount)}</span>
+                    <span className="font-semibold">
+                      {formatINR(upiDetails.amount)}
+                    </span>
                   </div>
                   <div className="mt-2 flex justify-between text-sm">
-                    <span className="text-muted-foreground">Distributor</span>
-                    <span className="font-medium">{upiDetails.distributorName}</span>
-                  </div>
-                  <div className="mt-2 flex justify-between text-sm">
-                    <span className="text-muted-foreground">UPI ID</span>
-                    <span className="font-mono text-xs">{upiDetails.upiId}</span>
-                  </div>
-                  <div className="mt-2 flex justify-between text-sm">
-                    <span className="text-muted-foreground">Order</span>
-                    <span className="font-mono text-xs">{upiDetails.orderNumber}</span>
+                    <span className="text-muted-foreground">Pay to</span>
+                    <span className="font-mono text-xs">
+                      {upiDetails.upiId}
+                    </span>
                   </div>
                 </div>
 
@@ -425,59 +303,159 @@ export function PaymentCheckout({
                 <div className="rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-400/30 dark:bg-amber-950 dark:text-amber-300">
                   <p className="font-medium">Instructions:</p>
                   <ol className="mt-1 list-inside list-decimal space-y-0.5">
-                    <li>Open any UPI app (PhonePe, GPay, Paytm, etc.)</li>
-                    <li>Scan the QR code or pay to <strong>{upiDetails.upiId}</strong></li>
-                    <li>Pay exactly <strong>{formatINR(upiDetails.amount)}</strong></li>
-                    <li>Note the UTR / Transaction ID from your UPI app</li>
-                    <li>Enter the UTR below and submit</li>
+                    <li>
+                      Open any UPI app (PhonePe, GPay, Paytm, etc.)
+                    </li>
+                    <li>
+                      Scan the QR code or pay to{" "}
+                      <strong>{upiDetails.upiId}</strong>
+                    </li>
+                    <li>
+                      Pay exactly <strong>{formatINR(upiDetails.amount)}</strong>
+                    </li>
+                    <li>Return here and click "I've Paid via UPI"</li>
                   </ol>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="utr" className="text-sm font-medium">
-                    UTR / Transaction ID *
-                  </label>
-                  <Input
-                    id="utr"
-                    placeholder="e.g. 123456789012"
-                    value={utr}
-                    onChange={(e) => setUtr(e.target.value)}
-                    maxLength={32}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Enter the 12-digit reference number from your UPI app.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 rounded-lg border border-blue-400/40 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-400/30 dark:bg-blue-950 dark:text-blue-300">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>
-                    Your payment will be verified by admin staff before being marked as
-                    received. This prevents fraudulent "I Paid" claims.
-                  </p>
                 </div>
 
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700"
-                  onClick={handleUpiPayment}
-                  disabled={upiInitiating || !utr.trim()}
+                  onClick={handleUpiSubmit}
+                  disabled={submitting}
                 >
-                  {upiInitiating ? (
+                  {submitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Submitting…
                     </>
                   ) : (
-                    "Submit Payment for Verification"
+                    "I've Paid via UPI"
                   )}
                 </Button>
+
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setPaymentMethod(null)}
+                  disabled={submitting}
+                >
+                  ← Back to payment methods
+                </Button>
               </>
-            ) : (
-              <div className="flex flex-col items-center gap-3 py-10">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Loading UPI details…</p>
+            ) : error ? (
+              <div className="py-6">
+                <p className="text-sm text-destructive">{error}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4"
+                  onClick={handleClose}
+                >
+                  Close
+                </Button>
               </div>
-            )}
+            ) : null}
+          </div>
+        )}
+
+        {/* Cash path */}
+        {!submitted && paymentMethod === "cash" && (
+          <div className="space-y-4 pt-4">
+            <div className="rounded-lg border bg-muted/40 p-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Amount</span>
+                <span className="font-semibold">{formatINR(amount)}</span>
+              </div>
+              <div className="mt-2 flex justify-between text-sm">
+                <span className="text-muted-foreground">Order</span>
+                <span className="font-mono text-xs">{orderNumber}</span>
+              </div>
+              <div className="mt-2 flex justify-between text-sm">
+                <span className="text-muted-foreground">Method</span>
+                <span className="font-medium">Cash</span>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-400/30 dark:bg-amber-950 dark:text-amber-300">
+              <p>
+                Pay the amount in cash to the distributor or authorized delivery
+                person.
+              </p>
+            </div>
+
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700"
+              onClick={handleCashSubmit}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting…
+                </>
+              ) : (
+                "Confirm Cash Payment"
+              )}
+            </Button>
+
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => setPaymentMethod(null)}
+              disabled={submitting}
+            >
+              ← Back to payment methods
+            </Button>
+          </div>
+        )}
+
+        {/* COD path */}
+        {!submitted && paymentMethod === "cod" && (
+          <div className="space-y-4 pt-4">
+            <div className="rounded-lg border bg-muted/40 p-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Amount to collect</span>
+                <span className="font-semibold">{formatINR(amount)}</span>
+              </div>
+              <div className="mt-2 flex justify-between text-sm">
+                <span className="text-muted-foreground">Order</span>
+                <span className="font-mono text-xs">{orderNumber}</span>
+              </div>
+              <div className="mt-2 flex justify-between text-sm">
+                <span className="text-muted-foreground">Method</span>
+                <span className="font-medium">Cash on Delivery</span>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-blue-400/40 bg-blue-50 p-3 text-xs text-blue-700 dark:border-blue-400/30 dark:bg-blue-950 dark:text-blue-300">
+              <p>
+                Please pay the exact amount in cash when your order is
+                delivered. The delivery boy will collect the payment.
+              </p>
+            </div>
+
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700"
+              onClick={handleCodSubmit}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting…
+                </>
+              ) : (
+                "Confirm Cash on Delivery"
+              )}
+            </Button>
+
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => setPaymentMethod(null)}
+              disabled={submitting}
+            >
+              ← Back to payment methods
+            </Button>
           </div>
         )}
       </div>

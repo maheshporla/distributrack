@@ -18,5 +18,7 @@ public enum PaymentChannel {
     MANUAL,
     GATEWAY,
     MOCK,
-    UPI
+    UPI,
+    CASH,
+    CASH_ON_DELIVERY
 }

@@ -1,5 +1,7 @@
 package com.distributrack.service;
 
+import com.distributrack.dto.request.CashPaymentSubmitRequest;
+import com.distributrack.dto.request.CodPaymentSubmitRequest;
 import com.distributrack.dto.request.PaymentInitiationRequest;
 import com.distributrack.dto.request.PaymentRequest;
 import com.distributrack.dto.request.UpiPaymentSubmitRequest;
@@ -79,9 +81,21 @@ public interface PaymentService {
 
     /**
      * Creates a PENDING_VERIFICATION payment record for a UPI payment
-     * submitted by the shopkeeper with a UTR. Admin must approve.
+     * submitted by the shopkeeper. UTR is optional. Admin must verify.
      */
     PaymentResponse submitUpiPayment(UpiPaymentSubmitRequest request);
+
+    /**
+     * Creates a PENDING_VERIFICATION payment record for a cash payment.
+     * Shopkeeper claims they paid cash — admin must verify.
+     */
+    PaymentResponse submitCashPayment(CashPaymentSubmitRequest request);
+
+    /**
+     * Creates a PENDING_VERIFICATION payment record for Cash on Delivery.
+     * Payment is collected during delivery by the delivery boy.
+     */
+    PaymentResponse submitCodPayment(CodPaymentSubmitRequest request);
 
     // ---------------------------------------------------------
     // Admin verification

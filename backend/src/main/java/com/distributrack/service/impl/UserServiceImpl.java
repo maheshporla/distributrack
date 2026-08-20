@@ -421,18 +421,10 @@ public class UserServiceImpl implements UserService {
         }
 
         // Workers can only toggle between AVAILABLE and OFFLINE.
-        // BUSY is controlled by the delivery system.
         if (targetAvailability != WorkerAvailability.AVAILABLE
                 && targetAvailability != WorkerAvailability.OFFLINE) {
             throw new RuntimeException(
                     "Workers can only set availability to AVAILABLE or OFFLINE");
-        }
-
-        // Cannot go AVAILABLE if currently BUSY with an active delivery.
-        if (targetAvailability == WorkerAvailability.AVAILABLE
-                && current.getAvailability() == WorkerAvailability.BUSY) {
-            throw new RuntimeException(
-                    "Cannot go online while you have an active delivery");
         }
 
         current.setAvailability(targetAvailability);
@@ -467,10 +459,6 @@ public class UserServiceImpl implements UserService {
                 .filter(u -> u.getEnabled()
                         && u.getAvailability() == WorkerAvailability.AVAILABLE)
                 .count();
-        long busy = allWorkers.stream()
-                .filter(u -> u.getEnabled()
-                        && u.getAvailability() == WorkerAvailability.BUSY)
-                .count();
         long offline = allWorkers.stream()
                 .filter(u -> u.getEnabled()
                         && u.getAvailability() == WorkerAvailability.OFFLINE)
@@ -482,7 +470,6 @@ public class UserServiceImpl implements UserService {
         return Map.of(
                 "total", total,
                 "available", available,
-                "busy", busy,
                 "offline", offline,
                 "pendingApplications", pending
         );

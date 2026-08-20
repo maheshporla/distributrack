@@ -17,6 +17,7 @@ import com.distributrack.service.AuditService;
 import com.distributrack.service.DeliveryService;
 import com.distributrack.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DeliveryServiceImpl implements DeliveryService {
@@ -169,13 +171,8 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         delivery = deliveryRepository.save(delivery);
 
-        // When a delivery ends (DELIVERED/FAILED/CANCELLED), check if the
-        // worker has other active deliveries. If not, set them back to AVAILABLE.
-        if (nextStatus == DeliveryStatus.DELIVERED
-                || nextStatus == DeliveryStatus.FAILED
-                || nextStatus == DeliveryStatus.CANCELLED) {
-            refreshWorkerAvailability(delivery.getDeliveryBoy());
-        }
+        // Worker stays AVAILABLE regardless of delivery status —
+        // they can handle multiple simultaneous deliveries.
 
         // Notify the shopkeeper about the delivery status.
         switch (nextStatus) {
@@ -371,9 +368,7 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         delivery = deliveryRepository.save(delivery);
 
-        // Mark worker as BUSY.
-        current.setAvailability(WorkerAvailability.BUSY);
-        userRepository.save(current);
+        // Worker stays AVAILABLE — they can handle multiple deliveries.
 
         // Sync order lifecycle.
         delivery.getOrder().transitionTo(OrderStatus.ASSIGNED);
@@ -419,8 +414,7 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         delivery = deliveryRepository.save(delivery);
 
-        // Free the previous worker if they have no other active deliveries.
-        refreshWorkerAvailability(previousWorker);
+        // Previous worker stays AVAILABLE — they can handle multiple deliveries.
 
         // Sync order lifecycle — order goes back to APPROVED.
         delivery.getOrder().transitionTo(OrderStatus.APPROVED);
@@ -436,29 +430,56 @@ public class DeliveryServiceImpl implements DeliveryService {
     }
 
     /**
-     * After a delivery ends, check if the worker has other active
-     * (ASSIGNED/OUT_FOR_DELIVERY) deliveries. If not, set them
-     * back to AVAILABLE so they can receive new assignments.
+     * Process the FIFO delivery queue: assign all waiting AVAILABLE deliveries
+     * to eligible workers using round-robin distribution.
+     * Called when orders are approved and when workers toggle online.
      */
-    private void refreshWorkerAvailability(User worker) {
-        if (worker == null) {
-            return;
-        }
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void processWaitingDeliveries() {
+        try {
+            List<Delivery> availableDeliveries = deliveryRepository.findAvailableDeliveries();
+            if (availableDeliveries.isEmpty()) {
+                return;
+            }
 
-        List<Delivery> activeDeliveries = deliveryRepository.findByDeliveryBoy(worker)
-                .stream()
-                .filter(d -> d.getDeliveryStatus() == DeliveryStatus.ASSIGNED
-                        || d.getDeliveryStatus() == DeliveryStatus.OUT_FOR_DELIVERY)
-                .toList();
+            List<User> eligibleWorkers = userRepository
+                    .findByRole_Name(RoleName.DELIVERY_BOY)
+                    .stream()
+                    .filter(User::getEnabled)
+                    .filter(w -> w.getAvailability() == WorkerAvailability.AVAILABLE)
+                    .toList();
 
-        if (activeDeliveries.isEmpty()
-                && worker.getAvailability() == WorkerAvailability.BUSY) {
-            worker.setAvailability(WorkerAvailability.AVAILABLE);
-            userRepository.save(worker);
+            if (eligibleWorkers.isEmpty()) {
+                log.info("No available workers for {} waiting deliveries", availableDeliveries.size());
+                return;
+            }
 
-            auditService.log("WORKER_AVAILABILITY", "User", worker.getId(),
-                    "Worker " + worker.getFullName()
-                            + " set back to AVAILABLE (no active deliveries)");
+            // FIFO: assign each waiting delivery to the next available worker (round-robin).
+            int workerIndex = 0;
+            for (Delivery delivery : availableDeliveries) {
+                User worker = eligibleWorkers.get(workerIndex % eligibleWorkers.size());
+                workerIndex++;
+
+                delivery.setDeliveryBoy(worker);
+                delivery.setDeliveryStatus(DeliveryStatus.ASSIGNED);
+                delivery.setAssignedAt(LocalDateTime.now());
+                deliveryRepository.save(delivery);
+
+                delivery.getOrder().transitionTo(OrderStatus.ASSIGNED);
+                orderRepository.save(delivery.getOrder());
+
+                notificationService.notifyDeliveryAssigned(delivery);
+
+                auditService.log("DELIVERY_FIFO_ASSIGN", "Delivery", delivery.getId(),
+                        "FIFO: Order " + delivery.getOrder().getOrderNumber()
+                                + " assigned to " + worker.getFullName());
+
+                log.info("FIFO assigned order {} to worker {}",
+                        delivery.getOrder().getOrderNumber(), worker.getFullName());
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to process FIFO queue: {}", e.getMessage());
         }
     }
 
@@ -490,6 +511,62 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .availableAt(delivery.getAvailableAt())
                 .assignedAt(delivery.getAssignedAt())
                 .deliveredAt(delivery.getDeliveredAt())
+                .codCollected(delivery.getCodCollected() != null ? delivery.getCodCollected() : false)
+                .codCollectedAt(delivery.getCodCollectedAt())
+                .codCollectedByName(delivery.getCodCollectedBy() != null ? delivery.getCodCollectedBy().getFullName() : null)
+                .codAmount(delivery.getCodAmount())
+                .codCollectionNotes(delivery.getCodCollectionNotes())
                 .build();
+    }
+
+    // --- Cash on Delivery collection ---
+
+    @Override
+    @Transactional
+    public DeliveryResponse confirmCashCollection(Long deliveryId) {
+
+        User current = currentUserService.getCurrentUser();
+
+        // Only DELIVERY_BOY can confirm collection.
+        if (current.getRole().getName() != RoleName.DELIVERY_BOY) {
+            throw new RuntimeException("Only delivery workers can confirm cash collection");
+        }
+
+        Delivery delivery = deliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new RuntimeException("Delivery not found with id: " + deliveryId));
+
+        // Must be the worker's own delivery.
+        assertCanModify(delivery);
+
+        // Cash can only be collected for DELIVERED or OUT_FOR_DELIVERY deliveries.
+        if (delivery.getDeliveryStatus() != DeliveryStatus.DELIVERED
+                && delivery.getDeliveryStatus() != DeliveryStatus.OUT_FOR_DELIVERY) {
+            throw new RuntimeException("Cash collection is only available for active or delivered deliveries");
+        }
+
+        // Must not have already collected.
+        if (Boolean.TRUE.equals(delivery.getCodCollected())) {
+            throw new RuntimeException("Cash has already been collected for this delivery");
+        }
+
+        // The order must be marked as DELIVERED before collection.
+        if (delivery.getOrder().getStatus() != OrderStatus.DELIVERED
+                && delivery.getOrder().getStatus() != OrderStatus.COMPLETED) {
+            throw new RuntimeException("The order must be delivered before collecting cash");
+        }
+
+        delivery.setCodCollected(true);
+        delivery.setCodCollectedAt(LocalDateTime.now());
+        delivery.setCodCollectedBy(current);
+        delivery.setCodAmount(delivery.getOrder().getTotalAmount());
+
+        delivery = deliveryRepository.save(delivery);
+
+        auditService.log("COD_COLLECT", "Delivery", delivery.getId(),
+                "Cash collection confirmed for order " + delivery.getOrder().getOrderNumber()
+                        + " by " + current.getFullName()
+                        + " (amount: " + delivery.getOrder().getTotalAmount() + ")");
+
+        return mapToResponse(delivery);
     }
 }

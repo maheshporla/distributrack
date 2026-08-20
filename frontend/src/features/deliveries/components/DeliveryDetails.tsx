@@ -9,11 +9,15 @@ import {
 import L from "leaflet";
 import {
   ArrowLeft,
+  Banknote,
+  CheckCircle,
   Crosshair,
+  Loader2,
   LocateFixed,
   MapPin,
   Navigation,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +37,7 @@ import {
   type GpsStatus,
 } from "@/features/deliveries/hooks/useLiveTracking";
 
+import { deliveryService } from "@/services/api/deliveryService";
 import type { Delivery, DeliveryStatus } from "@/types/delivery.types";
 import type { RoleName } from "@/types/auth.types";
 
@@ -116,6 +121,21 @@ export function DeliveryDetails({
   onStatusChange,
   onDeliveryUpdated,
 }: DeliveryDetailsProps) {
+  const [codCollecting, setCodCollecting] = useState(false);
+
+  const handleCollectCash = async () => {
+    try {
+      setCodCollecting(true);
+      const updated = await deliveryService.confirmCashCollection(delivery.id);
+      onDeliveryUpdated(updated);
+      toast.success("Cash collection confirmed successfully.");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to confirm cash collection");
+    } finally {
+      setCodCollecting(false);
+    }
+  };
+
   const statusMeta = DELIVERY_STATUS_META[delivery.deliveryStatus];
   const active = isDeliveryActive(delivery.deliveryStatus);
 
@@ -332,6 +352,62 @@ export function DeliveryDetails({
             Failure Reason
           </p>
           <p className="mt-1 text-sm">{delivery.failureReason}</p>
+        </div>
+      )}
+
+      {/* Cash on Delivery collection */}
+      {role === "DELIVERY_BOY" && delivery.codAmount != null && delivery.codAmount > 0 && (
+        <div className="rounded-lg border bg-card p-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Banknote className="h-4 w-4 text-primary" />
+            Cash on Delivery
+          </h2>
+          {delivery.codCollected ? (
+            <div className="mt-3 space-y-1">
+              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                <CheckCircle className="h-4 w-4" />
+                <span className="font-medium">Payment Collected</span>
+              </div>
+              <p className="text-2xl font-semibold">{formatINR(delivery.codAmount)}</p>
+              {delivery.codCollectedAt && (
+                <p className="text-xs text-muted-foreground">
+                  Collected at: {formatDateTime(delivery.codCollectedAt)}
+                </p>
+              )}
+              {delivery.codCollectedByName && (
+                <p className="text-xs text-muted-foreground">
+                  Collected by: {delivery.codCollectedByName}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <div className="rounded-lg border border-amber-400/40 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-400/30 dark:bg-amber-950 dark:text-amber-300">
+                <p className="font-medium">Payment Details:</p>
+                <p className="mt-1">Method: Cash on Delivery</p>
+                <p>Amount to Collect: {formatINR(delivery.codAmount)}</p>
+                <p>Status: Pending Collection</p>
+              </div>
+
+              <Button
+                onClick={handleCollectCash}
+                disabled={codCollecting}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                {codCollecting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Confirming…
+                  </>
+                ) : (
+                  <>
+                    <Banknote className="mr-2 h-4 w-4" />
+                    Mark Cash Collected
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

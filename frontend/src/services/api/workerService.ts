@@ -1,12 +1,11 @@
 import { axiosInstance } from "@/services/api/axiosInstance";
 import { ENDPOINTS } from "@/constants/endpoints.constants";
 
-export type WorkerAvailability = "AVAILABLE" | "BUSY" | "OFFLINE";
+export type WorkerAvailability = "AVAILABLE" | "OFFLINE";
 
 export interface DeliveryBoyStats {
   total: number;
   available: number;
-  busy: number;
   offline: number;
   pendingApplications: number;
 }

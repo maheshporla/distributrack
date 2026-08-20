@@ -325,42 +325,6 @@ class UserServiceImplTest {
                 () -> userService.toggleAvailability(WorkerAvailability.AVAILABLE));
     }
 
-    @Test
-    void busyWorkerCannotGoAvailable() {
-
-        User worker = User.builder()
-                .id(20L)
-                .fullName("Worker")
-                .email("worker@test.com")
-                .phone("9555555555")
-                .enabled(true)
-                .availability(WorkerAvailability.BUSY)
-                .role(new Role(5L, RoleName.DELIVERY_BOY))
-                .build();
-        when(currentUserService.getCurrentUser()).thenReturn(worker);
-
-        assertThrows(RuntimeException.class,
-                () -> userService.toggleAvailability(WorkerAvailability.AVAILABLE));
-    }
-
-    @Test
-    void adminCannotSetBusyAvailability() {
-
-        User worker = User.builder()
-                .id(20L)
-                .fullName("Worker")
-                .email("worker@test.com")
-                .phone("9555555555")
-                .enabled(true)
-                .availability(WorkerAvailability.OFFLINE)
-                .role(new Role(5L, RoleName.DELIVERY_BOY))
-                .build();
-        when(currentUserService.getCurrentUser()).thenReturn(worker);
-
-        assertThrows(RuntimeException.class,
-                () -> userService.toggleAvailability(WorkerAvailability.BUSY));
-    }
-
     // --- Delivery Boy Statistics Tests ---
 
     @Test
@@ -372,10 +336,6 @@ class UserServiceImplTest {
                 .id(20L).fullName("A").email("a@test.com")
                 .enabled(true).availability(WorkerAvailability.AVAILABLE)
                 .role(new Role(5L, RoleName.DELIVERY_BOY)).build();
-        User busy = User.builder()
-                .id(21L).fullName("B").email("b@test.com")
-                .enabled(true).availability(WorkerAvailability.BUSY)
-                .role(new Role(5L, RoleName.DELIVERY_BOY)).build();
         User offline = User.builder()
                 .id(22L).fullName("C").email("c@test.com")
                 .enabled(true).availability(WorkerAvailability.OFFLINE)
@@ -386,13 +346,12 @@ class UserServiceImplTest {
                 .role(new Role(5L, RoleName.DELIVERY_BOY)).build();
 
         when(userRepository.findByRole_Name(RoleName.DELIVERY_BOY))
-                .thenReturn(List.of(available, busy, offline, pending));
+                .thenReturn(List.of(available, offline, pending));
 
         var stats = userService.getDeliveryBoyStatistics();
 
-        assertEquals(4L, stats.get("total"));
+        assertEquals(3L, stats.get("total"));
         assertEquals(1L, stats.get("available"));
-        assertEquals(1L, stats.get("busy"));
         assertEquals(1L, stats.get("offline"));
         assertEquals(1L, stats.get("pendingApplications"));
     }

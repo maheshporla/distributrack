@@ -99,4 +99,12 @@ export const deliveryService = {
     );
     return response.data;
   },
+
+  /** Delivery boy confirms cash collection for COD orders. */
+  async confirmCashCollection(deliveryId: number): Promise<Delivery> {
+    const response = await axiosInstance.post<Delivery>(
+      `/delivery/${deliveryId}/collect-cash`,
+    );
+    return response.data;
+  },
 };

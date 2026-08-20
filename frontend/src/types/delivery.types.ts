@@ -72,6 +72,16 @@ export interface Delivery {
   availableAt: string;
   assignedAt: string | null;
   deliveredAt: string | null;
+  /** Whether cash was collected by the delivery boy (COD). */
+  codCollected: boolean;
+  /** When the cash was collected. */
+  codCollectedAt: string | null;
+  /** Who collected the cash (delivery boy name). */
+  codCollectedByName: string | null;
+  /** The COD amount to collect. */
+  codAmount: number | null;
+  /** Collection notes from the delivery boy. */
+  codCollectionNotes: string | null;
 }
 
 /** Matches DeliveryRequest.java. */

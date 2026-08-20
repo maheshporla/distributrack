@@ -23,7 +23,10 @@ public class UpiPaymentSubmitRequest {
     @NotNull(message = "Order Id is required")
     private Long orderId;
 
-    @NotBlank(message = "UTR / Transaction ID is required")
+    /**
+     * Optional UTR (Unique Transaction Reference) from the shopkeeper's UPI payment.
+     * Admin can use this for verification but it is no longer required to submit.
+     */
     @Size(min = 6, max = 32, message = "UTR must be between 6 and 32 characters")
     private String utr;
 }
