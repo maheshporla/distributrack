@@ -10,6 +10,7 @@ import com.distributrack.entity.Product;
 import com.distributrack.entity.User;
 import com.distributrack.enums.OrderStatus;
 import com.distributrack.enums.RoleName;
+import com.distributrack.repository.DeliveryRepository;
 import com.distributrack.repository.OrderItemRepository;
 import com.distributrack.repository.OrderRepository;
 import com.distributrack.repository.ProductRepository;
@@ -34,6 +35,7 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final DeliveryRepository deliveryRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final CurrentUserService currentUserService;
@@ -161,6 +163,12 @@ public class OrderServiceImpl implements OrderService {
 
         orderRepository.save(order);
 
+        // When order is approved, auto-create an AVAILABLE delivery
+        // so online workers can accept it.
+        if (nextStatus == OrderStatus.APPROVED) {
+            createAvailableDelivery(order);
+        }
+
         // Notify the shopkeeper about the approval decision.
         switch (nextStatus) {
             case APPROVED -> notificationService.notifyOrderApproved(order);
@@ -173,6 +181,36 @@ public class OrderServiceImpl implements OrderService {
                 "Order " + order.getOrderNumber() + " status changed to " + nextStatus);
 
         return mapToResponse(order);
+    }
+
+    /**
+     * Creates an AVAILABLE delivery for an approved order.
+     * No delivery boy is assigned yet — workers accept it.
+     */
+    private void createAvailableDelivery(Order order) {
+        // Check if a delivery already exists for this order.
+        com.distributrack.entity.Delivery existing =
+                deliveryRepository.findByOrder(order).orElse(null);
+        if (existing != null) {
+            return; // Already has a delivery record.
+        }
+
+        // Use the shopkeeper's address as the default delivery address.
+        String deliveryAddress = order.getShopkeeper().getAddress() != null
+                ? order.getShopkeeper().getAddress()
+                : order.getShopkeeper().getFullName();
+
+        com.distributrack.entity.Delivery delivery =
+                com.distributrack.entity.Delivery.builder()
+                        .order(order)
+                        .deliveryStatus(com.distributrack.enums.DeliveryStatus.AVAILABLE)
+                        .deliveryAddress(deliveryAddress)
+                        .build();
+
+        deliveryRepository.save(delivery);
+
+        auditService.log("DELIVERY_CREATE_AVAILABLE", "Delivery", null,
+                "Available delivery created for order " + order.getOrderNumber());
     }
 
     @Override

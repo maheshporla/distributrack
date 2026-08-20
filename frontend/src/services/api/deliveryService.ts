@@ -75,4 +75,28 @@ export const deliveryService = {
     );
     return response.data;
   },
+
+  // --- Automatic delivery workflow ---
+
+  /** Get AVAILABLE deliveries (visible to online workers). */
+  async getAvailableDeliveries(): Promise<Delivery[]> {
+    const response = await axiosInstance.get<Delivery[]>("/delivery/available");
+    return response.data;
+  },
+
+  /** Worker accepts an AVAILABLE delivery (atomic first-accept). */
+  async acceptDelivery(deliveryId: number): Promise<Delivery> {
+    const response = await axiosInstance.post<Delivery>(
+      `/delivery/${deliveryId}/accept`,
+    );
+    return response.data;
+  },
+
+  /** Admin emergency reassignment (moves delivery back to AVAILABLE). */
+  async emergencyReassign(deliveryId: number): Promise<Delivery> {
+    const response = await axiosInstance.post<Delivery>(
+      `/delivery/${deliveryId}/emergency-reassign`,
+    );
+    return response.data;
+  },
 };

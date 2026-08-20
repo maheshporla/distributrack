@@ -287,8 +287,8 @@ export function CustomerDetails({ customer, onBack }: CustomerDetailsProps) {
                       {deliveries.map((d) => (
                         <tr key={d.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                           <td className="py-3 pr-4 font-medium">{d.orderNumber}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{d.deliveryBoyName}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{formatDate(d.assignedAt)}</td>
+                          <td className="py-3 px-4 text-muted-foreground">{d.deliveryBoyName ?? "Unassigned"}</td>
+                          <td className="py-3 px-4 text-muted-foreground">{d.assignedAt ? formatDate(d.assignedAt) : d.availableAt ? formatDate(d.availableAt) : "—"}</td>
                           <td className="py-3 px-4 text-xs font-mono">{d.vehicleNumber ?? "—"}</td>
                           <td className="py-3 px-4 max-w-xs truncate text-muted-foreground" title={d.deliveryAddress}>
                             {d.deliveryAddress}

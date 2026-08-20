@@ -24,8 +24,10 @@ public class DeliveryResponse {
 
     private String orderNumber;
 
+    /** Null when delivery is AVAILABLE (not yet accepted). */
     private Long deliveryBoyId;
 
+    /** Null when delivery is AVAILABLE (not yet accepted). */
     private String deliveryBoyName;
 
     // Customer / order summary (carried on the delivery so DELIVERY_BOY
@@ -54,6 +56,8 @@ public class DeliveryResponse {
     private Double longitude;
 
     private LocalDateTime lastLocationAt;
+
+    private LocalDateTime availableAt;
 
     private LocalDateTime assignedAt;
 

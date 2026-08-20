@@ -68,6 +68,7 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .deliveryAddress(request.getDeliveryAddress())
                 .vehicleNumber(request.getVehicleNumber())
                 .deliveryStatus(DeliveryStatus.ASSIGNED)
+                .assignedAt(LocalDateTime.now())
                 .build();
 
         delivery = deliveryRepository.save(delivery);
@@ -90,12 +91,15 @@ public class DeliveryServiceImpl implements DeliveryService {
         List<Delivery> deliveries;
 
         if (current.getRole().getName() == RoleName.DELIVERY_BOY) {
+            // Workers see only their own assigned deliveries.
             deliveries = deliveryRepository.findByDeliveryBoy(current);
         } else if (current.getRole().getName() == RoleName.SHOPKEEPER) {
+            // Shopkeepers see deliveries for their own orders (all statuses).
             deliveries = deliveryRepository.findAll().stream()
                     .filter(d -> d.getOrder().getShopkeeper().getId().equals(current.getId()))
                     .toList();
         } else {
+            // Admin/distributor sees everything.
             deliveries = deliveryRepository.findAll();
         }
 
@@ -266,9 +270,14 @@ public class DeliveryServiceImpl implements DeliveryService {
         User current = currentUserService.getCurrentUser();
         RoleName role = current.getRole().getName();
 
-        if (role == RoleName.DELIVERY_BOY
-                && !delivery.getDeliveryBoy().getId().equals(current.getId())) {
-            throw new RuntimeException("Delivery not found with id: " + delivery.getId());
+        // DELIVERY_BOY can view AVAILABLE deliveries (to accept them)
+        // and their own assigned deliveries.
+        if (role == RoleName.DELIVERY_BOY) {
+            if (delivery.getDeliveryBoy() != null
+                    && !delivery.getDeliveryBoy().getId().equals(current.getId())) {
+                throw new RuntimeException("Delivery not found with id: " + delivery.getId());
+            }
+            // AVAILABLE deliveries with null deliveryBoy are viewable by all workers.
         }
 
         if (role == RoleName.SHOPKEEPER
@@ -287,9 +296,12 @@ public class DeliveryServiceImpl implements DeliveryService {
         User current = currentUserService.getCurrentUser();
         RoleName role = current.getRole().getName();
 
-        if (role == RoleName.DELIVERY_BOY
-                && !delivery.getDeliveryBoy().getId().equals(current.getId())) {
-            throw new RuntimeException("Delivery not found with id: " + delivery.getId());
+        if (role == RoleName.DELIVERY_BOY) {
+            // Must have an assigned delivery boy and it must be the current user.
+            if (delivery.getDeliveryBoy() == null
+                    || !delivery.getDeliveryBoy().getId().equals(current.getId())) {
+                throw new RuntimeException("Delivery not found with id: " + delivery.getId());
+            }
         }
 
         if (role == RoleName.SHOPKEEPER) {
@@ -305,14 +317,116 @@ public class DeliveryServiceImpl implements DeliveryService {
         }
     }
 
+    // --- Automatic delivery workflow ---
+
+    @Override
+    public List<DeliveryResponse> getAvailableDeliveries() {
+        return deliveryRepository.findAvailableDeliveries()
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public DeliveryResponse acceptDelivery(Long deliveryId) {
+
+        User current = currentUserService.getCurrentUser();
+
+        // Only DELIVERY_BOY can accept.
+        if (current.getRole().getName() != RoleName.DELIVERY_BOY) {
+            throw new RuntimeException("Only delivery workers can accept deliveries");
+        }
+
+        // Disabled workers cannot accept.
+        if (!Boolean.TRUE.equals(current.getEnabled())) {
+            throw new RuntimeException("Your account is disabled");
+        }
+
+        // Atomic pessimistic lock — only one transaction wins.
+        Delivery delivery = deliveryRepository.findByIdWithLock(deliveryId)
+                .orElseThrow(() -> new RuntimeException("Delivery not found with id: " + deliveryId));
+
+        // Must be AVAILABLE with no worker assigned.
+        if (delivery.getDeliveryStatus() != DeliveryStatus.AVAILABLE) {
+            throw new RuntimeException("This delivery is no longer available");
+        }
+        if (delivery.getDeliveryBoy() != null) {
+            throw new RuntimeException("This delivery has already been accepted by another worker");
+        }
+
+        // Atomically assign.
+        delivery.setDeliveryBoy(current);
+        delivery.setDeliveryStatus(DeliveryStatus.ASSIGNED);
+        delivery.setAssignedAt(LocalDateTime.now());
+
+        delivery = deliveryRepository.save(delivery);
+
+        // Sync order lifecycle.
+        delivery.getOrder().transitionTo(OrderStatus.ASSIGNED);
+        orderRepository.save(delivery.getOrder());
+
+        // Notify.
+        notificationService.notifyDeliveryAssigned(delivery);
+
+        auditService.log("DELIVERY_ACCEPT", "Delivery", delivery.getId(),
+                "Order " + delivery.getOrder().getOrderNumber()
+                        + " accepted by delivery boy " + current.getFullName());
+
+        return mapToResponse(delivery);
+    }
+
+    @Override
+    @Transactional
+    public DeliveryResponse emergencyReassign(Long deliveryId) {
+
+        User current = currentUserService.getCurrentUser();
+        RoleName role = current.getRole().getName();
+
+        // Only admin/distributor roles can emergency reassign.
+        if (role != RoleName.SUPER_ADMIN && role != RoleName.OWNER && role != RoleName.MANAGER) {
+            throw new RuntimeException("Only administrators can perform emergency reassignment");
+        }
+
+        Delivery delivery = deliveryRepository.findById(deliveryId)
+                .orElseThrow(() -> new RuntimeException("Delivery not found with id: " + deliveryId));
+
+        // Can only reassign ASSIGNED deliveries that haven't started.
+        if (delivery.getDeliveryStatus() != DeliveryStatus.ASSIGNED) {
+            throw new RuntimeException("Emergency reassignment is only available for ASSIGNED deliveries");
+        }
+
+        User previousWorker = delivery.getDeliveryBoy();
+
+        // Move back to AVAILABLE.
+        delivery.setDeliveryBoy(null);
+        delivery.setDeliveryStatus(DeliveryStatus.AVAILABLE);
+        delivery.setAvailableAt(LocalDateTime.now());
+        delivery.setAssignedAt(null);
+
+        delivery = deliveryRepository.save(delivery);
+
+        // Sync order lifecycle — order goes back to APPROVED.
+        delivery.getOrder().transitionTo(OrderStatus.APPROVED);
+        orderRepository.save(delivery.getOrder());
+
+        String workerName = previousWorker != null ? previousWorker.getFullName() : "unknown";
+        auditService.log("DELIVERY_EMERGENCY_REASSIGN", "Delivery", delivery.getId(),
+                "Order " + delivery.getOrder().getOrderNumber()
+                        + " emergency reassignment from worker " + workerName
+                        + " by " + current.getFullName());
+
+        return mapToResponse(delivery);
+    }
+
     private DeliveryResponse mapToResponse(Delivery delivery) {
 
         return DeliveryResponse.builder()
                 .id(delivery.getId())
                 .orderId(delivery.getOrder().getId())
                 .orderNumber(delivery.getOrder().getOrderNumber())
-                .deliveryBoyId(delivery.getDeliveryBoy().getId())
-                .deliveryBoyName(delivery.getDeliveryBoy().getFullName())
+                .deliveryBoyId(delivery.getDeliveryBoy() != null ? delivery.getDeliveryBoy().getId() : null)
+                .deliveryBoyName(delivery.getDeliveryBoy() != null ? delivery.getDeliveryBoy().getFullName() : null)
                 .shopkeeperId(delivery.getOrder().getShopkeeper().getId())
                 .shopkeeperName(delivery.getOrder().getShopkeeper().getFullName())
                 .shopkeeperPhone(delivery.getOrder().getShopkeeper().getPhone())
@@ -325,6 +439,7 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .latitude(delivery.getLatitude())
                 .longitude(delivery.getLongitude())
                 .lastLocationAt(delivery.getLastLocationAt())
+                .availableAt(delivery.getAvailableAt())
                 .assignedAt(delivery.getAssignedAt())
                 .deliveredAt(delivery.getDeliveredAt())
                 .build();

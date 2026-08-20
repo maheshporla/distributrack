@@ -5,13 +5,14 @@ import type { RoleName } from "@/types/auth.types";
  * Delivery status display metadata + the status actions the UI may offer.
  * Mirrors DeliveryStatus.canTransitionTo() on the backend exactly:
  *
- *   ASSIGNED        -> OUT_FOR_DELIVERY | CANCELLED
+ *   AVAILABLE        -> ASSIGNED (worker accepts) | CANCELLED
+ *   ASSIGNED         -> OUT_FOR_DELIVERY | CANCELLED
  *   OUT_FOR_DELIVERY -> DELIVERED | FAILED | CANCELLED
  *   DELIVERED / FAILED / CANCELLED -> terminal
  *
  * Role gating matches SecurityConfig + DeliveryServiceImpl:
- *   - DELIVERY_BOY  may update own deliveries (all legal transitions)
- *   - SA/OWNER/MANAGER may update operational deliveries
+ *   - DELIVERY_BOY  may accept AVAILABLE and update own deliveries
+ *   - SA/OWNER/MANAGER may emergency reassign and update any delivery
  *   - SHOPKEEPER    may never modify a delivery
  *
  * The backend remains authoritative — it re-validates every transition
@@ -22,7 +23,8 @@ export const DELIVERY_STATUS_META: Record<
   DeliveryStatus,
   { label: string; badgeVariant: "success" | "warning" | "destructive" | "info" | "default" | "secondary" }
 > = {
-  ASSIGNED: { label: "Assigned", badgeVariant: "info" },
+  AVAILABLE: { label: "Available", badgeVariant: "info" },
+  ASSIGNED: { label: "Assigned", badgeVariant: "default" },
   OUT_FOR_DELIVERY: { label: "Out for Delivery", badgeVariant: "warning" },
   DELIVERED: { label: "Delivered", badgeVariant: "success" },
   FAILED: { label: "Failed", badgeVariant: "destructive" },
@@ -40,6 +42,9 @@ export const DELIVERY_STATUS_ACTIONS: Record<
   DeliveryStatus,
   DeliveryStatusAction[]
 > = {
+  AVAILABLE: [
+    { to: "CANCELLED", label: "Cancel", buttonVariant: "outline" },
+  ],
   ASSIGNED: [
     { to: "OUT_FOR_DELIVERY", label: "Start Delivery", buttonVariant: "default" },
     { to: "CANCELLED", label: "Cancel", buttonVariant: "outline" },
@@ -62,7 +67,7 @@ export const DELIVERY_STATUS_ROLES: RoleName[] = [
   "DELIVERY_BOY",
 ];
 
-/** Roles that may assign (create) deliveries. */
+/** Roles that may assign (create) deliveries via emergency reassignment. */
 export const DELIVERY_ASSIGN_ROLES: RoleName[] = [
   "SUPER_ADMIN",
   "OWNER",

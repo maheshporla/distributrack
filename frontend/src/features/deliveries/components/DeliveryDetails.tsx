@@ -162,8 +162,13 @@ export function DeliveryDetails({
           </div>
 
           <p className="mt-1 text-sm text-muted-foreground">
-            Order {delivery.orderNumber} — assigned{" "}
-            {formatDateTime(delivery.assignedAt)}
+            Order {delivery.orderNumber}
+            {delivery.assignedAt && (
+              <> — assigned {formatDateTime(delivery.assignedAt)}</>
+            )}
+            {!delivery.assignedAt && delivery.availableAt && (
+              <> — available since {formatDateTime(delivery.availableAt)}</>
+            )}
           </p>
         </div>
 
@@ -190,10 +195,18 @@ export function DeliveryDetails({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Delivery Boy
           </p>
-          <p className="mt-1 font-medium">{delivery.deliveryBoyName}</p>
-          <p className="text-xs text-muted-foreground">
-            Worker ID: {delivery.deliveryBoyId}
-          </p>
+          {delivery.deliveryBoyName ? (
+            <>
+              <p className="mt-1 font-medium">{delivery.deliveryBoyName}</p>
+              <p className="text-xs text-muted-foreground">
+                Worker ID: {delivery.deliveryBoyId}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 font-medium text-muted-foreground italic">
+              Waiting for a worker to accept
+            </p>
+          )}
         </div>
 
         <div className="rounded-lg border border-border p-4">

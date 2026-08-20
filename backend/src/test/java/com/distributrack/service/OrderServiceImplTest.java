@@ -9,6 +9,7 @@ import com.distributrack.entity.Role;
 import com.distributrack.entity.User;
 import com.distributrack.enums.OrderStatus;
 import com.distributrack.enums.RoleName;
+import com.distributrack.repository.DeliveryRepository;
 import com.distributrack.repository.OrderItemRepository;
 import com.distributrack.repository.OrderRepository;
 import com.distributrack.repository.ProductRepository;
@@ -37,10 +38,12 @@ class OrderServiceImplTest {
     private final CurrentUserService currentUserService = mock(CurrentUserService.class);
     private final NotificationService notificationService = mock(NotificationService.class);
     private final AuditService auditService = mock(AuditService.class);
+    private final DeliveryRepository deliveryRepository = mock(DeliveryRepository.class);
 
     private final OrderServiceImpl orderService = new OrderServiceImpl(
             orderRepository,
             orderItemRepository,
+            deliveryRepository,
             productRepository,
             userRepository,
             currentUserService,

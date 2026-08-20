@@ -23,8 +23,12 @@ public class Delivery {
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
+    /**
+     * Nullable — null when the delivery is AVAILABLE (not yet accepted).
+     * Set atomically when a worker accepts the delivery.
+     */
     @ManyToOne
-    @JoinColumn(name = "delivery_boy_id", nullable = false)
+    @JoinColumn(name = "delivery_boy_id")
     private User deliveryBoy;
 
     @Enumerated(EnumType.STRING)
@@ -54,18 +58,25 @@ public class Delivery {
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
+    /** When the delivery was created / made available. */
+    @Column(name = "available_at")
+    private LocalDateTime availableAt;
+
+    /** When the delivery was accepted by a worker (ASSIGNED). */
     @Column
     private LocalDateTime assignedAt;
 
+    /** When the delivery was completed. */
     @Column
     private LocalDateTime deliveredAt;
 
     @PrePersist
     public void prePersist() {
-        assignedAt = LocalDateTime.now();
-
         if (deliveryStatus == null) {
-            deliveryStatus = DeliveryStatus.ASSIGNED;
+            deliveryStatus = DeliveryStatus.AVAILABLE;
+        }
+        if (availableAt == null) {
+            availableAt = LocalDateTime.now();
         }
     }
 }

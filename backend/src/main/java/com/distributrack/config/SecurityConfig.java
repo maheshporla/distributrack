@@ -159,14 +159,23 @@ public class SecurityConfig {
                         // Deliveries
                         // =====================================================
                         // Read: DELIVERY_BOY + SHOPKEEPER see only their own
-                        // deliveries (enforced in service).
+                        // deliveries (enforced in service). AVAILABLE endpoint
+                        // returns all unclaimed deliveries.
                         .requestMatchers(HttpMethod.GET, "/api/delivery/**")
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER", "DELIVERY_BOY", "SHOPKEEPER")
+
+                        // Worker accept: DELIVERY_BOY only (enforced in service).
+                        .requestMatchers(HttpMethod.POST, "/api/delivery/*/accept")
+                        .hasRole("DELIVERY_BOY")
 
                         // Status + live location updates: DELIVERY_BOY for own
                         // deliveries only (enforced in service).
                         .requestMatchers(HttpMethod.PUT, "/api/delivery/**")
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER", "DELIVERY_BOY")
+
+                        // Emergency reassign: admin roles only
+                        .requestMatchers(HttpMethod.POST, "/api/delivery/*/emergency-reassign")
+                        .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
 
                         // Assignment + delete: admin roles only
                         .requestMatchers("/api/delivery/**")

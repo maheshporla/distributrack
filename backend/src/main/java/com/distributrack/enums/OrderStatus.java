@@ -8,8 +8,9 @@ package com.distributrack.enums;
  *     -> APPROVED  (owner/manager approval)
  *     -> REJECTED  (terminal, owner/manager)
  *     -> CANCELLED (terminal)
- *   APPROVED -> ASSIGNED          (delivery created)
+ *   APPROVED -> ASSIGNED          (worker accepts delivery)
  *   ASSIGNED -> OUT_FOR_DELIVERY  (delivery boy starts)
+ *   ASSIGNED -> APPROVED          (emergency reassign — delivery freed)
  *   OUT_FOR_DELIVERY -> DELIVERED (delivery boy completes)
  *   OUT_FOR_DELIVERY -> APPROVED  (delivery FAILED — back to assignable)
  *   DELIVERED -> COMPLETED        (payment finalized; legacy terminal state)
@@ -38,7 +39,7 @@ public enum OrderStatus {
         return switch (this) {
             case PENDING -> next == APPROVED || next == REJECTED || next == CANCELLED;
             case APPROVED -> next == ASSIGNED || next == REJECTED || next == CANCELLED;
-            case ASSIGNED -> next == OUT_FOR_DELIVERY || next == CANCELLED;
+            case ASSIGNED -> next == OUT_FOR_DELIVERY || next == CANCELLED || next == APPROVED;
             case OUT_FOR_DELIVERY -> next == DELIVERED || next == CANCELLED || next == APPROVED;
             case DELIVERED -> next == COMPLETED;
             case REJECTED, COMPLETED, CANCELLED -> false;

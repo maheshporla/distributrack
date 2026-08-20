@@ -25,6 +25,7 @@
  */
 
 export const DELIVERY_STATUSES = [
+  "AVAILABLE",
   "ASSIGNED",
   "OUT_FOR_DELIVERY",
   "DELIVERED",
@@ -39,8 +40,10 @@ export interface Delivery {
   id: number;
   orderId: number;
   orderNumber: string;
-  deliveryBoyId: number;
-  deliveryBoyName: string;
+  /** Null when delivery is AVAILABLE (not yet accepted). */
+  deliveryBoyId: number | null;
+  /** Null when delivery is AVAILABLE (not yet accepted). */
+  deliveryBoyName: string | null;
   shopkeeperId: number;
   shopkeeperName: string;
   shopkeeperPhone: string;
@@ -55,7 +58,9 @@ export interface Delivery {
   latitude: number | null;
   longitude: number | null;
   lastLocationAt: string | null;
-  assignedAt: string;
+  /** When the delivery was made available for workers. */
+  availableAt: string;
+  assignedAt: string | null;
   deliveredAt: string | null;
 }
 

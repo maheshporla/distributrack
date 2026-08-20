@@ -88,4 +88,24 @@ public class DeliveryController {
 
         return deliveryService.getDeliveriesByStatus(status);
     }
+
+    // --- Automatic delivery workflow ---
+
+    // Get AVAILABLE deliveries (visible to online workers)
+    @GetMapping("/available")
+    public List<DeliveryResponse> getAvailableDeliveries() {
+        return deliveryService.getAvailableDeliveries();
+    }
+
+    // Worker accepts an AVAILABLE delivery (atomic first-accept)
+    @PostMapping("/{id}/accept")
+    public DeliveryResponse acceptDelivery(@PathVariable Long id) {
+        return deliveryService.acceptDelivery(id);
+    }
+
+    // Admin emergency reassignment
+    @PostMapping("/{id}/emergency-reassign")
+    public DeliveryResponse emergencyReassign(@PathVariable Long id) {
+        return deliveryService.emergencyReassign(id);
+    }
 }

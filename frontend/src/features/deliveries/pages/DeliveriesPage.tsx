@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, Plus, Route, Search } from "lucide-react";
+import { AlertTriangle, Eye, Route, Search } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import { deliveryService } from "@/services/api/deliveryService";
 import { useAuthStore } from "@/store/authStore";
 
 import { DELIVERY_STATUS_META } from "@/features/deliveries/deliveryStatus";
-import { DeliveryForm } from "@/features/deliveries/components/DeliveryForm";
 import { DeliveryDetails } from "@/features/deliveries/components/DeliveryDetails";
 
 import {
@@ -22,19 +21,13 @@ import {
   type DeliveryStatus,
 } from "@/types/delivery.types";
 import { cn } from "@/lib/utils";
-import { formatDateTime } from "@/lib/formatters";
-
-type PageView = "list" | "details" | "form";
+type PageView = "list" | "details";
 
 export function DeliveriesPage() {
   const user = useAuthStore((state) => state.user);
   const role = user?.role ?? "SHOPKEEPER";
 
-  // Matches SecurityConfig + DeliveryServiceImpl:
-  //   - assignment (POST /api/delivery) is SA/OWNER/MANAGER only
-  //   - status/location updates are SA/OWNER/MANAGER/DELIVERY_BOY
-  //     (handled inside DeliveryDetails via `role`)
-  const canAssign =
+  const canEmergencyReassign =
     role === "SUPER_ADMIN" || role === "OWNER" || role === "MANAGER";
 
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -47,17 +40,16 @@ export function DeliveriesPage() {
   const [view, setView] = useState<PageView>("list");
   const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
+  const [reassigningId, setReassigningId] = useState<number | null>(null);
 
   // =========================================================
-  // Load deliveries — the backend scopes the list by role
-  // (DELIVERY_BOY: own; SHOPKEEPER: own orders; business: all)
+  // Load deliveries
   // =========================================================
 
   const loadDeliveries = async () => {
     try {
       setIsLoading(true);
       setLoadError(null);
-
       const data = await deliveryService.getAllDeliveries();
       setDeliveries(data);
     } catch (error) {
@@ -73,7 +65,7 @@ export function DeliveriesPage() {
   }, []);
 
   // =========================================================
-  // Search + status filter (client-side over the loaded list)
+  // Search + status filter
   // =========================================================
 
   const displayedDeliveries = useMemo(() => {
@@ -83,13 +75,12 @@ export function DeliveriesPage() {
       if (statusFilter !== "all" && delivery.deliveryStatus !== statusFilter) {
         return false;
       }
-
       if (!keyword) return true;
 
       return (
         delivery.orderNumber.toLowerCase().includes(keyword) ||
         delivery.shopkeeperName.toLowerCase().includes(keyword) ||
-        delivery.deliveryBoyName.toLowerCase().includes(keyword) ||
+        (delivery.deliveryBoyName && delivery.deliveryBoyName.toLowerCase().includes(keyword)) ||
         delivery.deliveryStatus.toLowerCase().includes(keyword) ||
         delivery.deliveryAddress.toLowerCase().includes(keyword)
       );
@@ -97,7 +88,7 @@ export function DeliveriesPage() {
   }, [deliveries, searchKeyword, statusFilter]);
 
   // =========================================================
-  // Status update (SA/OWNER/MANAGER/DELIVERY_BOY only)
+  // Status update
   // =========================================================
 
   const handleStatusChange = async (
@@ -108,21 +99,14 @@ export function DeliveriesPage() {
 
     try {
       setUpdatingStatusId(selectedDelivery.id);
-
       const updated = await deliveryService.updateDeliveryStatus(
         selectedDelivery.id,
         next,
         failureReason,
       );
-
-      toast.success(
-        `Delivery marked as ${next.replace(/_/g, " ").toLowerCase()}`,
-      );
-
+      toast.success(`Delivery marked as ${next.replace(/_/g, " ").toLowerCase()}`);
       setDeliveries((prev) =>
-        prev.map((delivery) =>
-          delivery.id === updated.id ? updated : delivery,
-        ),
+        prev.map((d) => (d.id === updated.id ? updated : d)),
       );
       setSelectedDelivery(updated);
     } catch (error) {
@@ -133,23 +117,43 @@ export function DeliveriesPage() {
     }
   };
 
-  /** Merges a location-updated delivery back into the list state. */
   const handleDeliveryUpdated = (updated: Delivery) => {
     setDeliveries((prev) =>
-      prev.map((delivery) => (delivery.id === updated.id ? updated : delivery)),
+      prev.map((d) => (d.id === updated.id ? updated : d)),
     );
     setSelectedDelivery(updated);
   };
 
-  /**
-   * GPS freshness indicator for the list view.
-   * Shows a colored dot: green = recent, amber = stale, gray = none.
-   */
+  // =========================================================
+  // Emergency reassign
+  // =========================================================
+
+  const handleEmergencyReassign = async (delivery: Delivery) => {
+    const confirmed = window.confirm(
+      `Emergency reassign delivery for ${delivery.orderNumber}? This will make it available for other workers to accept.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setReassigningId(delivery.id);
+      await deliveryService.emergencyReassign(delivery.id);
+      toast.success(`Delivery for ${delivery.orderNumber} is now available for re-assignment`);
+      await loadDeliveries();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to reassign delivery");
+    } finally {
+      setReassigningId(null);
+    }
+  };
+
+  // =========================================================
+  // GPS freshness indicator
+  // =========================================================
+
   const STALE_MS = 5 * 60 * 1_000;
   function GpsIndicator({ delivery }: { delivery: Delivery }) {
-    const hasCoords =
-      delivery.latitude !== null &&
-      delivery.longitude !== null;
+    const hasCoords = delivery.latitude !== null && delivery.longitude !== null;
     const isStale = !delivery.lastLocationAt ||
       Date.now() - new Date(delivery.lastLocationAt).getTime() > STALE_MS;
 
@@ -183,20 +187,6 @@ export function DeliveriesPage() {
     setView("details");
   };
 
-  const handleAssignDelivery = () => {
-    setView("form");
-  };
-
-  const handleFormSuccess = async () => {
-    setView("list");
-    setSelectedDelivery(null);
-    await loadDeliveries();
-  };
-
-  const handleFormCancel = () => {
-    setView("list");
-  };
-
   const handleBackToList = () => {
     setView("list");
     setSelectedDelivery(null);
@@ -206,28 +196,6 @@ export function DeliveriesPage() {
     setSearchKeyword("");
     setStatusFilter("all");
   };
-
-  // =========================================================
-  // Assign Delivery Screen (SA/OWNER/MANAGER)
-  // =========================================================
-
-  if (view === "form") {
-    return (
-      <div className="space-y-6">
-        <PageHeader
-          title="Assign Delivery"
-          description="Assign an approved order to a delivery worker."
-        />
-
-        <div className="rounded-lg border bg-card p-6">
-          <DeliveryForm
-            onSuccess={handleFormSuccess}
-            onCancel={handleFormCancel}
-          />
-        </div>
-      </div>
-    );
-  }
 
   // =========================================================
   // Delivery Details Screen
@@ -259,26 +227,14 @@ export function DeliveriesPage() {
             ? "Your assigned deliveries and live tracking."
             : role === "SHOPKEEPER"
               ? "Track the delivery of your orders."
-              : "Assign, track and manage deliveries."
-        }
-        actions={
-          canAssign ? (
-            <Button onClick={handleAssignDelivery}>
-              <Plus className="mr-2 h-4 w-4" />
-              Assign Delivery
-            </Button>
-          ) : undefined
+              : "Monitor deliveries and manage emergency reassignment."
         }
       />
 
       {/* Search + Status Filter */}
       <div className="flex flex-col gap-3 lg:flex-row">
         <div className="relative flex-1">
-          <Search
-            className="absolute left-3 top-1/2 h-4 w-4
-            -translate-y-1/2 text-muted-foreground"
-          />
-
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={searchKeyword}
             onChange={(event) => setSearchKeyword(event.target.value)}
@@ -295,7 +251,6 @@ export function DeliveriesPage() {
           className="h-10 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="all">All Statuses</option>
-
           {DELIVERY_STATUSES.map((status) => (
             <option key={status} value={status}>
               {DELIVERY_STATUS_META[status].label}
@@ -318,14 +273,10 @@ export function DeliveriesPage() {
             description={loadError}
             onRetry={loadDeliveries}
           />
-
         ) : isLoading ? (
           <div className="flex min-h-40 items-center justify-center">
-            <p className="text-sm text-muted-foreground">
-              Loading deliveries...
-            </p>
+            <p className="text-sm text-muted-foreground">Loading deliveries...</p>
           </div>
-
         ) : displayedDeliveries.length === 0 ? (
           <EmptyState
             icon={Route}
@@ -336,25 +287,17 @@ export function DeliveriesPage() {
             }
             description={
               deliveries.length === 0
-                ? canAssign
-                  ? "Assign an approved order to a delivery worker to get started."
-                  : "You have no deliveries right now."
+                ? "Approve an order to automatically create an available delivery."
                 : "Try clearing the search or choosing a different status."
             }
             action={
-              deliveries.length === 0 && canAssign ? (
-                <Button onClick={handleAssignDelivery}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Assign Delivery
-                </Button>
-              ) : deliveries.length > 0 ? (
+              deliveries.length > 0 ? (
                 <Button variant="outline" onClick={handleClearFilters}>
                   Clear Filters
                 </Button>
               ) : undefined
             }
           />
-
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -362,40 +305,31 @@ export function DeliveriesPage() {
                 <tr className="border-b text-left">
                   <th className="px-4 py-3">Order</th>
                   <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Delivery Boy</th>
-                  <th className="px-4 py-3">Assigned</th>
+                  <th className="px-4 py-3">Worker</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">GPS</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-
               <tbody>
                 {displayedDeliveries.map((delivery) => {
-                  const statusMeta =
-                    DELIVERY_STATUS_META[delivery.deliveryStatus];
+                  const statusMeta = DELIVERY_STATUS_META[delivery.deliveryStatus];
 
                   return (
                     <tr key={delivery.id} className="border-b last:border-0">
                       <td className="px-4 py-3">
-                        <span className="font-medium">
-                          {delivery.orderNumber}
-                        </span>
+                        <span className="font-medium">{delivery.orderNumber}</span>
                         <p className="text-xs text-muted-foreground">
                           Delivery #{delivery.id}
                         </p>
                       </td>
 
-                      <td className="px-4 py-3">
-                        {delivery.shopkeeperName}
-                      </td>
+                      <td className="px-4 py-3">{delivery.shopkeeperName}</td>
 
                       <td className="px-4 py-3">
-                        {delivery.deliveryBoyName}
-                      </td>
-
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {formatDateTime(delivery.assignedAt)}
+                        {delivery.deliveryBoyName ?? (
+                          <span className="text-muted-foreground italic">Unassigned</span>
+                        )}
                       </td>
 
                       <td className="px-4 py-3">
@@ -409,7 +343,22 @@ export function DeliveriesPage() {
                       </td>
 
                       <td className="px-4 py-3">
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
+                          {canEmergencyReassign &&
+                            delivery.deliveryStatus === "ASSIGNED" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEmergencyReassign(delivery)}
+                              disabled={reassigningId === delivery.id}
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <AlertTriangle className="mr-1 h-3.5 w-3.5" />
+                              {reassigningId === delivery.id
+                                ? "Reassigning..."
+                                : "Emergency Reassign"}
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"

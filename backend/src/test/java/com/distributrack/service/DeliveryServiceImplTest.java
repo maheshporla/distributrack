@@ -103,6 +103,7 @@ class DeliveryServiceImplTest {
         List<DeliveryResponse> deliveries = deliveryService.getAllDeliveries();
 
         assertEquals(1, deliveries.size());
+        assertNotNull(deliveries.get(0).getDeliveryBoyId());
         assertEquals(boy.getId(), deliveries.get(0).getDeliveryBoyId());
         verify(deliveryRepository, never()).findAll();
     }
@@ -308,5 +309,145 @@ class DeliveryServiceImplTest {
         DeliveryResponse response = deliveryService.updateDeliveryLocation(9L, 19.0760, 72.8777);
 
         assertNotNull(response.getLatitude());
+    }
+
+    // ------------------------------------------------------------------
+    // Automatic delivery workflow tests
+    // ------------------------------------------------------------------
+
+    @Test
+    void deliveryBoyCanAcceptAvailableDelivery() {
+
+        boy.setEnabled(true);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        Delivery delivery = Delivery.builder()
+                .id(9L)
+                .order(Order.builder()
+                        .id(5L).orderNumber("ORD-TEST")
+                        .shopkeeper(shopkeeper)
+                        .totalAmount(BigDecimal.valueOf(1000))
+                        .status(OrderStatus.APPROVED)
+                        .build())
+                .deliveryStatus(DeliveryStatus.AVAILABLE)
+                .deliveryAddress("Test Address")
+                .build();
+
+        when(deliveryRepository.findByIdWithLock(9L)).thenReturn(Optional.of(delivery));
+
+        DeliveryResponse response = deliveryService.acceptDelivery(9L);
+
+        assertEquals(DeliveryStatus.ASSIGNED, response.getDeliveryStatus());
+        assertNotNull(response.getDeliveryBoyId());
+        assertEquals(boy.getId(), response.getDeliveryBoyId());
+        assertNotNull(response.getAssignedAt());
+        verify(deliveryRepository).save(delivery);
+    }
+
+    @Test
+    void disabledWorkerCannotAccept() {
+
+        boy.setEnabled(false);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        assertThrows(RuntimeException.class,
+                () -> deliveryService.acceptDelivery(9L));
+    }
+
+    @Test
+    void nonWorkerCannotAccept() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(shopkeeper);
+
+        assertThrows(RuntimeException.class,
+                () -> deliveryService.acceptDelivery(9L));
+    }
+
+    @Test
+    void alreadyAssignedDeliveryCannotBeAccepted() {
+
+        boy.setEnabled(true);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.ASSIGNED, OrderStatus.ASSIGNED);
+        when(deliveryRepository.findByIdWithLock(9L)).thenReturn(Optional.of(delivery));
+
+        assertThrows(RuntimeException.class,
+                () -> deliveryService.acceptDelivery(9L));
+    }
+
+    @Test
+    void completedDeliveryCannotBeAccepted() {
+
+        boy.setEnabled(true);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.DELIVERED, OrderStatus.DELIVERED);
+        when(deliveryRepository.findByIdWithLock(9L)).thenReturn(Optional.of(delivery));
+
+        assertThrows(RuntimeException.class,
+                () -> deliveryService.acceptDelivery(9L));
+    }
+
+    @Test
+    void adminCanEmergencyReassign() {
+
+        User manager = User.builder()
+                .id(10L).fullName("Manager")
+                .email("mgr@test.com")
+                .role(new Role(3L, RoleName.MANAGER))
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(manager);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.ASSIGNED, OrderStatus.ASSIGNED);
+        when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
+
+        DeliveryResponse response = deliveryService.emergencyReassign(9L);
+
+        assertEquals(DeliveryStatus.AVAILABLE, response.getDeliveryStatus());
+        assertNull(response.getDeliveryBoyId());
+        assertNotNull(response.getAvailableAt());
+        verify(deliveryRepository).save(delivery);
+    }
+
+    @Test
+    void unauthorizedUserCannotEmergencyReassign() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.ASSIGNED, OrderStatus.ASSIGNED);
+        when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
+
+        assertThrows(RuntimeException.class,
+                () -> deliveryService.emergencyReassign(9L));
+    }
+
+    @Test
+    void shopkeeperCannotEmergencyReassign() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(shopkeeper);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.ASSIGNED, OrderStatus.ASSIGNED);
+        when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
+
+        assertThrows(RuntimeException.class,
+                () -> deliveryService.emergencyReassign(9L));
+    }
+
+    @Test
+    void emergencyReassignOnlyForAssignedStatus() {
+
+        User manager = User.builder()
+                .id(10L).fullName("Manager")
+                .email("mgr@test.com")
+                .role(new Role(3L, RoleName.MANAGER))
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(manager);
+
+        Delivery delivery = deliveryFor(boy, DeliveryStatus.OUT_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY);
+        when(deliveryRepository.findById(9L)).thenReturn(Optional.of(delivery));
+
+        assertThrows(RuntimeException.class,
+                () -> deliveryService.emergencyReassign(9L));
     }
 }

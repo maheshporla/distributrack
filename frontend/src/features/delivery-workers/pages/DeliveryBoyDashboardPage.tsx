@@ -21,6 +21,7 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 import { deliveryService } from "@/services/api/deliveryService";
+import { ROUTES as DELIVERY_ROUTES } from "@/constants/routes.constants";
 import { useAuthStore } from "@/store/authStore";
 import { DELIVERY_STATUS_META } from "@/features/deliveries/deliveryStatus";
 import { ROUTES } from "@/constants/routes.constants";
@@ -39,14 +40,20 @@ export function DeliveryBoyDashboardPage() {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [availableCount, setAvailableCount] = useState(0);
+  const [isOnline, setIsOnline] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true);
         setLoadError(null);
-        const data = await deliveryService.getAllDeliveries();
-        setDeliveries(data);
+        const [myDeliveries, available] = await Promise.all([
+          deliveryService.getAllDeliveries(),
+          deliveryService.getAvailableDeliveries(),
+        ]);
+        setDeliveries(myDeliveries);
+        setAvailableCount(available.length);
       } catch (error) {
         console.error(error);
         setLoadError("Failed to load dashboard data");
@@ -79,8 +86,8 @@ export function DeliveryBoyDashboardPage() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return deliveries.filter((d) => {
-      const assigned = new Date(d.assignedAt);
-      return assigned >= today;
+      if (!d.assignedAt) return false;
+      return new Date(d.assignedAt) >= today;
     });
   }, [deliveries]);
 
@@ -105,9 +112,10 @@ export function DeliveryBoyDashboardPage() {
   // --- Recent deliveries (last 5) ---
   const recentDeliveries = useMemo(() => {
     return [...deliveries]
+      .filter((d) => d.assignedAt)
       .sort(
         (a, b) =>
-          new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime(),
+          new Date(b.assignedAt!).getTime() - new Date(a.assignedAt!).getTime(),
       )
       .slice(0, 5);
   }, [deliveries]);
@@ -146,14 +154,50 @@ export function DeliveryBoyDashboardPage() {
         title={`Welcome, ${user?.fullName ?? "Driver"}`}
         description="Your delivery dashboard overview."
         actions={
-          <Button asChild>
-            <Link to={ROUTES.DELIVERY_WORKER_DELIVERIES}>
-              <Route className="mr-2 h-4 w-4" />
-              My Deliveries
-            </Link>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button asChild>
+              <Link to={DELIVERY_ROUTES.DELIVERY_WORKER_AVAILABLE}>
+                <Package className="mr-2 h-4 w-4" />
+                Available ({availableCount})
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to={DELIVERY_ROUTES.DELIVERY_WORKER_DELIVERIES}>
+                <Route className="mr-2 h-4 w-4" />
+                My Deliveries
+              </Link>
+            </Button>
+          </div>
         }
       />
+
+      {/* --- Online Status --- */}
+      <div className="flex items-center gap-3 rounded-lg border bg-card p-4">
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "inline-block size-2.5 rounded-full",
+              isOnline ? "bg-green-500" : "bg-muted-foreground/40",
+            )}
+          />
+          <span className="text-sm font-medium">
+            {isOnline ? "ONLINE" : "OFFLINE"}
+          </span>
+        </div>
+        <Button
+          variant={isOnline ? "outline" : "default"}
+          size="sm"
+          onClick={() => setIsOnline(!isOnline)}
+        >
+          {isOnline ? "Go Offline" : "Go Online"}
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {isOnline
+            ? "You can see and accept available deliveries."
+            : "Go online to see available deliveries."
+          }
+        </p>
+      </div>
 
       {/* --- Stats Grid --- */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -248,7 +292,7 @@ export function DeliveryBoyDashboardPage() {
 
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>{formatINR(delivery.orderTotalAmount)}</span>
-                      <span>{formatDateTime(delivery.assignedAt)}</span>
+                      {delivery.assignedAt && <span>{formatDateTime(delivery.assignedAt)}</span>}
                       <Button variant="outline" size="sm" asChild>
                         <Link
                           to={ROUTES.DELIVERY_WORKER_DELIVERIES}

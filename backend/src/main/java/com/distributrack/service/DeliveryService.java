@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface DeliveryService {
 
-    // Create Delivery
+    // Create Delivery (admin emergency or initial)
     DeliveryResponse createDelivery(DeliveryRequest request);
 
     // Get All Deliveries
@@ -30,4 +30,21 @@ public interface DeliveryService {
 
     // Update Live GPS Location For A Delivery
     DeliveryResponse updateDeliveryLocation(Long id, Double latitude, Double longitude);
+
+    // --- Automatic delivery workflow ---
+
+    /** Get AVAILABLE deliveries visible to online workers. */
+    List<DeliveryResponse> getAvailableDeliveries();
+
+    /**
+     * Worker accepts an AVAILABLE delivery. Atomic first-accept:
+     * only one worker succeeds if multiple try simultaneously.
+     */
+    DeliveryResponse acceptDelivery(Long deliveryId);
+
+    /**
+     * Admin/Distributor emergency reassignment.
+     * Moves a delivery back to AVAILABLE so another worker can accept it.
+     */
+    DeliveryResponse emergencyReassign(Long deliveryId);
 }
