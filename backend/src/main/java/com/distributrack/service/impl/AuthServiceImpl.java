@@ -50,19 +50,19 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponse register(RegisterRequest request) {
 
         // SECURITY: public self-registration must never be able to create
-        // privileged accounts. Staff (OWNER/MANAGER/SALESMAN/DELIVERY_BOY)
-        // and additional SHOPKEEPER accounts are created by authenticated
-        // staff via the /api/users endpoints. The first SUPER_ADMIN is
-        // created manually via the guarded first-admin setup endpoint
-        // (SetupServiceImpl) — never automatically.
-        if (request.getRole() != RoleName.SHOPKEEPER) {
+        // privileged accounts. Only SHOPKEEPER and DELIVERY_BOY are allowed
+        // through public registration. All other roles (SUPER_ADMIN, OWNER,
+        // MANAGER, SALESMAN) are created by authenticated staff via
+        // /api/users endpoints.
+        if (request.getRole() != RoleName.SHOPKEEPER
+                && request.getRole() != RoleName.DELIVERY_BOY) {
             throw new RuntimeException(
-                    "Public registration is only allowed for the SHOPKEEPER role"
+                    "Public registration is only allowed for Shopkeeper and Delivery Partner roles"
             );
         }
 
         // A fresh system must bootstrap the first SUPER_ADMIN before any
-        // SHOPKEEPER registers; otherwise public registration could lock
+        // registration; otherwise public registration could lock
         // the system out of first-admin setup (which requires an empty
         // users table).
         if (!userRepository.existsByRole_Name(RoleName.SUPER_ADMIN)) {
@@ -82,6 +82,8 @@ public class AuthServiceImpl implements AuthService {
         Role role = roleRepository.findByName(request.getRole())
                 .orElseThrow(() -> new RuntimeException("Role not found"));
 
+        boolean isDeliveryBoy = request.getRole() == RoleName.DELIVERY_BOY;
+
         User user = User.builder()
                 .fullName(request.getFullName())
                 .email(request.getEmail())
@@ -89,11 +91,25 @@ public class AuthServiceImpl implements AuthService {
                 .phone(request.getPhone())
                 .shopName(trimToNull(request.getShopName()))
                 .address(trimToNull(request.getAddress()))
-                .enabled(true)
+                .city(trimToNull(request.getCity()))
+                .vehicleType(trimToNull(request.getVehicleType()))
+                .vehicleNumber(trimToNull(request.getVehicleNumber()))
+                // Delivery partners require admin approval before they can
+                // log in or access the delivery portal.
+                .enabled(!isDeliveryBoy)
                 .role(role)
                 .build();
 
         userRepository.save(user);
+
+        if (isDeliveryBoy) {
+            // No tokens — the account is disabled until an admin approves it.
+            log.info("Delivery partner registered: {} (pending approval)",
+                    user.getEmail());
+            return AuthResponse.builder()
+                    .message("Registration submitted successfully. Your account is waiting for admin approval.")
+                    .build();
+        }
 
         RefreshTokenResponse tokenResponse =
                 refreshTokenService.createRefreshToken(user);

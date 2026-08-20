@@ -40,6 +40,7 @@ export const ROUTES = {
   CUSTOMERS: "/customers",
   ORDERS: "/orders",
   DELIVERY_WORKERS: "/delivery-workers",
+  DELIVERY_APPLICATIONS: "/delivery-applications",
   DELIVERIES: "/deliveries",
   USERS: "/users",
   INVOICES: "/invoices",

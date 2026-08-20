@@ -30,6 +30,15 @@ public class UserResponse {
 
     private Boolean enabled;
 
+    /** Delivery partner: city of operation. Nullable. */
+    private String city;
+
+    /** Delivery partner: vehicle type. Nullable. */
+    private String vehicleType;
+
+    /** Delivery partner: vehicle number. Nullable. */
+    private String vehicleNumber;
+
     private Boolean emailNotificationsEnabled;
 
     private Boolean smsNotificationsEnabled;

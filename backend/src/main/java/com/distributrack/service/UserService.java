@@ -31,4 +31,15 @@ public interface UserService {
      * references (orders, deliveries) are preserved.
      */
     void deleteUser(Long id);
+
+    // --- Delivery Partner Applications ---
+
+    /** List pending (disabled) delivery partner applications. */
+    List<UserResponse> getPendingDeliveryApplications();
+
+    /** Approve a pending delivery partner: enable the account. */
+    UserResponse approveDeliveryApplication(Long userId);
+
+    /** Reject a pending delivery partner: keep disabled, mark rejected. */
+    UserResponse rejectDeliveryApplication(Long userId);
 }

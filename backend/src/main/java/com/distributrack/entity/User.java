@@ -46,9 +46,21 @@ public class User implements UserDetails {
     @Column(name = "shop_name", length = 120)
     private String shopName;
 
-    /** B2B: delivery/billing address (SHOPKEEPER accounts). Optional. */
+    /** B2B: delivery/billing address (SHOPKEEPER accounts). Also used by DELIVERY_BOY. */
     @Column(length = 255)
     private String address;
+
+    /** Delivery partner: city of operation. */
+    @Column(length = 100)
+    private String city;
+
+    /** Delivery partner: vehicle type (Bike, Scooter, Van, Truck, etc.). */
+    @Column(name = "vehicle_type", length = 50)
+    private String vehicleType;
+
+    /** Delivery partner: vehicle registration number. */
+    @Column(name = "vehicle_number", length = 20)
+    private String vehicleNumber;
 
     @Column(nullable = false)
     @Builder.Default

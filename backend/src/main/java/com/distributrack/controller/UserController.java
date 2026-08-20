@@ -58,4 +58,21 @@ public class UserController {
         userService.deleteUser(id);
         return "User disabled successfully";
     }
+
+    // --- Delivery Partner Applications ---
+
+    @GetMapping("/delivery-applications")
+    public List<UserResponse> getPendingDeliveryApplications() {
+        return userService.getPendingDeliveryApplications();
+    }
+
+    @PutMapping("/delivery-applications/{id}/approve")
+    public UserResponse approveDeliveryApplication(@PathVariable Long id) {
+        return userService.approveDeliveryApplication(id);
+    }
+
+    @PutMapping("/delivery-applications/{id}/reject")
+    public UserResponse rejectDeliveryApplication(@PathVariable Long id) {
+        return userService.rejectDeliveryApplication(id);
+    }
 }

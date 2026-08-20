@@ -27,11 +27,23 @@ public class RegisterRequest {
     @Size(max = 120, message = "Shop name cannot exceed 120 characters")
     private String shopName;
 
-    /** B2B: shop address. Optional. */
+    /** B2B: delivery/billing address. Also used by DELIVERY_BOY for city/address. */
     @Size(max = 255, message = "Address cannot exceed 255 characters")
     private String address;
 
-    /** Backend-enforced: public registration is SHOPKEEPER only. */
+    /** Delivery partner: city of operation. Optional. */
+    @Size(max = 100, message = "City cannot exceed 100 characters")
+    private String city;
+
+    /** Delivery partner: vehicle type (Bike, Scooter, Van, Truck, etc.). Optional. */
+    @Size(max = 50, message = "Vehicle type cannot exceed 50 characters")
+    private String vehicleType;
+
+    /** Delivery partner: vehicle registration number. Optional. */
+    @Size(max = 20, message = "Vehicle number cannot exceed 20 characters")
+    private String vehicleNumber;
+
+    /** Backend-enforced: public registration allows SHOPKEEPER and DELIVERY_BOY only. */
     @NotNull(message = "Role is required")
     private RoleName role;
 }

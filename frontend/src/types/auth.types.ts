@@ -44,10 +44,16 @@ export interface RegisterPayload {
   email: string;
   password: string;
   phone: string;
-  /** B2B: shop/business name (optional). */
+  /** B2B: shop/business name (optional, SHOPKEEPER). */
   shopName?: string;
-  /** B2B: shop address (optional). */
+  /** B2B: shop/delivery address. */
   address?: string;
+  /** Delivery partner: city of operation (DELIVERY_BOY). */
+  city?: string;
+  /** Delivery partner: vehicle type (optional). */
+  vehicleType?: string;
+  /** Delivery partner: vehicle registration number (optional). */
+  vehicleNumber?: string;
   role: RoleName;
 }
 
@@ -63,13 +69,12 @@ export interface LoginApiResponse {
 }
 
 /**
- * Matches AuthResponse.java — registration returns tokens too, but the
- * current UX intentionally routes the user to /login afterwards (see
- * useRegister.ts) rather than auto-authenticating.
+ * Matches AuthResponse.java — registration returns tokens for shopkeepers,
+ * but delivery partner registration returns no tokens (account pending approval).
  */
 export interface RegisterApiResponse {
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  refreshToken?: string;
   message: string;
 }
 

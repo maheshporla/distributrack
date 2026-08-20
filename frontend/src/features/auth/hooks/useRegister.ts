@@ -1,9 +1,13 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { authService } from "@/services/api/authService";
-import { registerSchema, type RegisterFormValues } from "@/schemas/auth.schemas";
+import {
+  registerSchema,
+  type RegisterFormValues,
+} from "@/schemas/auth.schemas";
 import { ROUTES } from "@/constants/routes.constants";
 import type { RegisterPayload } from "@/types/auth.types";
 import type { ApiError } from "@/types/common.types";
@@ -12,49 +16,70 @@ import type { ApiError } from "@/types/common.types";
  * Encapsulates the Register form: validation, submission, and
  * post-registration navigation.
  *
- * The backend restricts public registration to the SHOPKEEPER role and
- * returns a token pair, but the current UX intentionally sends the user
- * to /login to sign in with their new credentials rather than
- * auto-authenticating (see RegisterApiResponse in auth.types.ts).
+ * Supports both Shopkeeper and Delivery Partner registration.
+ * - Shopkeeper: redirects to /login after successful registration.
+ * - Delivery Partner: shows a pending-approval success message.
  */
 export function useRegister() {
   const navigate = useNavigate();
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
+      registrationType: "shopkeeper",
       fullName: "",
       email: "",
       phone: "",
-      // Public registration is SHOPKEEPER-only — the backend rejects any
-      // other role (AuthServiceImpl), so the form always submits this.
       role: "SHOPKEEPER",
       shopName: "",
       address: "",
+      city: "",
+      vehicleType: "",
+      vehicleNumber: "",
       password: "",
       confirmPassword: "",
-    },
+    } as any,
   });
 
+  const registrationType = form.watch("registrationType" as any);
+
   const onSubmit = form.handleSubmit(async (values) => {
-    // confirmPassword exists only for client-side validation (see
-    // auth.schemas.ts) — the backend's RegisterRequest has no such field.
-    const { confirmPassword: _confirmPassword, ...payload } = values;
-    const registerPayload: RegisterPayload = payload;
+    // confirmPassword exists only for client-side validation — strip it.
+    const { confirmPassword: _confirmPassword, registrationType: _regType, ...rest } =
+      values as any;
+    const registerPayload: RegisterPayload = {
+      ...rest,
+      role: registrationType === "delivery_partner" ? "DELIVERY_BOY" : "SHOPKEEPER",
+    };
 
     try {
       const response = await authService.register(registerPayload);
-      toast.success(response.message);
-      navigate(ROUTES.LOGIN, { replace: true });
+
+      if (registrationType === "delivery_partner") {
+        // Show success message — no tokens returned, user cannot log in yet.
+        setSuccessMessage(
+          response.message ||
+            "Registration submitted successfully. Your account is waiting for admin approval."
+        );
+        setRegistrationSuccess(true);
+      } else {
+        toast.success(response.message);
+        navigate(ROUTES.LOGIN, { replace: true });
+      }
     } catch (error) {
-      // axiosInstance's response interceptor already normalizes every
-      // rejection to ApiError — see services/api/axiosInstance.ts.
       const apiError = error as ApiError;
       toast.error(apiError.message);
-      // Deliberately not calling form.reset() — preserve everything the
-      // user entered so they can fix one field and resubmit.
     }
   });
 
-  return { form, onSubmit, isSubmitting: form.formState.isSubmitting };
+  return {
+    form,
+    onSubmit,
+    isSubmitting: form.formState.isSubmitting,
+    registrationType: registrationType as string,
+    registrationSuccess,
+    successMessage,
+  };
 }

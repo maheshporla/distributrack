@@ -21,4 +21,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByRole_Name(RoleName roleName);
 
+    /** Pending delivery partner applications: DELIVERY_BOY role, not yet approved. */
+    List<User> findByRole_NameAndEnabled(RoleName roleName, boolean enabled);
+
 }

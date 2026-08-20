@@ -30,30 +30,60 @@ export const loginSchema = z.object({
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
 // ---------------------------------------------------------------------------
-// Register
+// Register — Shopkeeper
 // ---------------------------------------------------------------------------
-export const registerSchema = z
+export const shopkeeperRegisterSchema = z
   .object({
+    registrationType: z.literal("shopkeeper"),
     fullName: z.string().min(1, "Full Name is required").trim(),
     email: emailSchema,
     phone: z
       .string()
       .min(1, "Phone Number is required")
       .regex(/^[0-9+\-\s]{7,15}$/, "Enter a valid phone number"),
-    // Public registration is SHOPKEEPER-only (enforced server-side in
-    // AuthServiceImpl; this literal mirrors that contract). Staff roles
-    // are created by admins via /api/users — see UserManagementPage.
     role: z.literal("SHOPKEEPER", { message: "Role is required" }),
     shopName: z.string().trim().max(120, "Shop name cannot exceed 120 characters").optional(),
     address: z.string().trim().max(255, "Address cannot exceed 255 characters").optional(),
     password: passwordSchema,
-    /** Client-only field — never sent to the backend, stripped before the API call. */
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
   });
+export type ShopkeeperRegisterFormValues = z.infer<typeof shopkeeperRegisterSchema>;
+
+// ---------------------------------------------------------------------------
+// Register — Delivery Partner
+// ---------------------------------------------------------------------------
+export const deliveryPartnerRegisterSchema = z
+  .object({
+    registrationType: z.literal("delivery_partner"),
+    fullName: z.string().min(1, "Full Name is required").trim(),
+    email: emailSchema,
+    phone: z
+      .string()
+      .min(1, "Phone Number is required")
+      .regex(/^[0-9+\-\s]{7,15}$/, "Enter a valid phone number"),
+    role: z.literal("DELIVERY_BOY", { message: "Role is required" }),
+    city: z.string().trim().min(1, "City is required").max(100, "City cannot exceed 100 characters"),
+    address: z.string().trim().min(1, "Address is required").max(255, "Address cannot exceed 255 characters"),
+    vehicleType: z.string().trim().max(50, "Vehicle type cannot exceed 50 characters").optional(),
+    vehicleNumber: z.string().trim().max(20, "Vehicle number cannot exceed 20 characters").optional(),
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+export type DeliveryPartnerRegisterFormValues = z.infer<typeof deliveryPartnerRegisterSchema>;
+
+// Combined union — discriminated by registrationType
+export const registerSchema = z.discriminatedUnion("registrationType", [
+  shopkeeperRegisterSchema,
+  deliveryPartnerRegisterSchema,
+]);
 export type RegisterFormValues = z.infer<typeof registerSchema>;
 
 // ---------------------------------------------------------------------------

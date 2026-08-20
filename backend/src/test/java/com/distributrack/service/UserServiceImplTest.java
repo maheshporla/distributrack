@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -150,5 +151,115 @@ class UserServiceImplTest {
 
         assertTrue(ex.getMessage().contains("SUPER_ADMIN"));
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    // --- Delivery Partner Application Tests ---
+
+    @Test
+    void getPendingDeliveryApplications() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+
+        User pendingWorker = User.builder()
+                .id(10L)
+                .fullName("Pending Worker")
+                .email("pending@test.com")
+                .phone("9333333333")
+                .city("Hyderabad")
+                .enabled(false)
+                .role(new Role(5L, RoleName.DELIVERY_BOY))
+                .build();
+
+        when(userRepository.findByRole_NameAndEnabled(RoleName.DELIVERY_BOY, false))
+                .thenReturn(List.of(pendingWorker));
+
+        List<UserResponse> applications = userService.getPendingDeliveryApplications();
+
+        assertEquals(1, applications.size());
+        assertEquals("Pending Worker", applications.get(0).getFullName());
+        assertEquals("Hyderabad", applications.get(0).getCity());
+        assertFalse(applications.get(0).getEnabled());
+    }
+
+    @Test
+    void adminCanApproveDeliveryApplication() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+
+        User pendingWorker = User.builder()
+                .id(10L)
+                .fullName("Pending Worker")
+                .email("pending@test.com")
+                .phone("9333333333")
+                .enabled(false)
+                .role(new Role(5L, RoleName.DELIVERY_BOY))
+                .build();
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(pendingWorker));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserResponse response = userService.approveDeliveryApplication(10L);
+
+        assertTrue(response.getEnabled());
+        assertEquals(RoleName.DELIVERY_BOY, response.getRole());
+        verify(auditService).log(eq("DELIVERY_APP_APPROVE"), anyString(), eq(10L), anyString());
+    }
+
+    @Test
+    void nonAdminCannotApproveDeliveryApplication() {
+
+        User shopkeeper = User.builder()
+                .id(3L)
+                .role(new Role(6L, RoleName.SHOPKEEPER))
+                .build();
+        when(currentUserService.getCurrentUser()).thenReturn(shopkeeper);
+
+        assertThrows(RuntimeException.class,
+                () -> userService.approveDeliveryApplication(10L));
+    }
+
+    @Test
+    void adminCanRejectDeliveryApplication() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+
+        User pendingWorker = User.builder()
+                .id(10L)
+                .fullName("Pending Worker")
+                .email("pending@test.com")
+                .phone("9333333333")
+                .enabled(false)
+                .role(new Role(5L, RoleName.DELIVERY_BOY))
+                .build();
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(pendingWorker));
+
+        UserResponse response = userService.rejectDeliveryApplication(10L);
+
+        assertFalse(response.getEnabled());
+        verify(userRepository).delete(pendingWorker);
+        verify(auditService).log(eq("DELIVERY_APP_REJECT"), anyString(), eq(10L), anyString());
+    }
+
+    @Test
+    void cannotApproveAlreadyApprovedApplication() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+
+        User approvedWorker = User.builder()
+                .id(10L)
+                .fullName("Approved Worker")
+                .email("approved@test.com")
+                .phone("9444444444")
+                .enabled(true)
+                .role(new Role(5L, RoleName.DELIVERY_BOY))
+                .build();
+
+        when(userRepository.findById(10L)).thenReturn(Optional.of(approvedWorker));
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.approveDeliveryApplication(10L));
+
+        assertTrue(ex.getMessage().contains("already approved"));
     }
 }

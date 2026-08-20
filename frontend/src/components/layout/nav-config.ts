@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Bell,
   Settings,
+  UserCheck,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes.constants";
 import type { NavItem } from "@/types/ui.types";
@@ -160,6 +161,13 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
         // Staff/account administration is SUPER_ADMIN / OWNER / MANAGER
         // only — matches the /api/users rules in SecurityConfig; the
         // role matrix (who may create which role) is enforced server-side.
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+      },
+      {
+        label: "Delivery Applications",
+        path: ROUTES.DELIVERY_APPLICATIONS,
+        icon: UserCheck,
+        // Admin-only review of pending delivery partner registrations.
         roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
       },
     ],

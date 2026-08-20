@@ -32,6 +32,7 @@ import { FirstAdminSetupPage } from "@/features/setup/pages/FirstAdminSetupPage"
 import { WorkerProfilePage } from "@/features/delivery-workers/pages/WorkerProfilePage";
 import { DeliveryBoyDashboardPage } from "@/features/delivery-workers/pages/DeliveryBoyDashboardPage";
 import { AvailableDeliveriesPage } from "@/features/delivery-workers/pages/AvailableDeliveriesPage";
+import { DeliveryPartnerApplicationsPage } from "@/features/delivery-workers/pages/DeliveryPartnerApplicationsPage";
 
 /**
  * Analytics and Reports are the only Recharts-heavy pages; lazy-loading
@@ -243,6 +244,14 @@ export function AppRouter() {
           element={
             <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
               <UsersManagementPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_APPLICATIONS}
+          element={
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+              <DeliveryPartnerApplicationsPage />
             </RequireRole>
           }
         />

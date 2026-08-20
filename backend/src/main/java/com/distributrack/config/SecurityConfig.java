@@ -105,6 +105,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/users/**")
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN")
 
+                        // Delivery partner applications: admin roles only
+                        .requestMatchers("/api/users/delivery-applications/**")
+                        .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
+
                         .requestMatchers("/api/users/**")
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
 

@@ -57,16 +57,18 @@ class AuthServiceImplTest {
     @Test
     void publicRegistrationRejectsPrivilegedRoles() {
 
+        // SHOPKEEPER and DELIVERY_BOY are allowed; everything else is rejected.
         for (RoleName role : new RoleName[]{
                 RoleName.SUPER_ADMIN, RoleName.OWNER, RoleName.MANAGER,
-                RoleName.SALESMAN, RoleName.DELIVERY_BOY
+                RoleName.SALESMAN
         }) {
             RuntimeException ex = assertThrows(
                     RuntimeException.class,
                     () -> authService.register(registerRequest(role)),
                     "Role " + role + " must be rejected"
             );
-            assertTrue(ex.getMessage().contains("SHOPKEEPER"));
+            assertTrue(ex.getMessage().contains("Shopkeeper")
+                    || ex.getMessage().contains("Delivery Partner"));
         }
 
         verify(userRepository, never()).save(any(User.class));
@@ -94,6 +96,34 @@ class AuthServiceImplTest {
         verify(userRepository).save(argThat(user ->
                 user.getRole().getName() == RoleName.SHOPKEEPER
                         && user.getEmail().equals("shop@test.com")));
+    }
+
+    @Test
+    void publicRegistrationDeliveryBoyCreatesDisabledAccount() {
+
+        // A SUPER_ADMIN must already exist.
+        when(userRepository.existsByRole_Name(RoleName.SUPER_ADMIN)).thenReturn(true);
+        when(userRepository.existsByEmail("shop@test.com")).thenReturn(false);
+        when(userRepository.existsByPhone("9876543210")).thenReturn(false);
+        when(roleRepository.findByName(RoleName.DELIVERY_BOY))
+                .thenReturn(Optional.of(new Role(5L, RoleName.DELIVERY_BOY)));
+        when(passwordEncoder.encode("secret123")).thenReturn("encoded");
+
+        // DELIVERY_BOY registration does NOT create tokens — account is pending.
+        AuthResponse response = authService.register(registerRequest(RoleName.DELIVERY_BOY));
+
+        // No tokens — pending approval.
+        assertNull(response.getAccessToken());
+        assertNull(response.getRefreshToken());
+        assertTrue(response.getMessage().contains("waiting for admin approval"));
+
+        // User saved with enabled=false.
+        verify(userRepository).save(argThat(user ->
+                user.getRole().getName() == RoleName.DELIVERY_BOY
+                        && !user.getEnabled()));
+
+        // No refresh token should have been created.
+        verify(refreshTokenService, never()).createRefreshToken(any());
     }
 
     @Test

@@ -15,6 +15,7 @@ import com.distributrack.service.AuditService;
 import com.distributrack.service.NotificationService;
 import com.distributrack.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ import java.util.UUID;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -291,10 +293,104 @@ public class UserServiceImpl implements UserService {
                 .phone(user.getPhone())
                 .shopName(user.getShopName())
                 .address(user.getAddress())
+                .city(user.getCity())
+                .vehicleType(user.getVehicleType())
+                .vehicleNumber(user.getVehicleNumber())
                 .role(user.getRole().getName())
                 .enabled(user.getEnabled())
                 .emailNotificationsEnabled(user.getEmailNotificationsEnabled())
                 .smsNotificationsEnabled(user.getSmsNotificationsEnabled())
+                .createdAt(user.getCreatedAt())
+                .build();
+    }
+
+    // --- Delivery Partner Applications ---
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> getPendingDeliveryApplications() {
+        return userRepository
+                .findByRole_NameAndEnabled(RoleName.DELIVERY_BOY, false)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    @Override
+    public UserResponse approveDeliveryApplication(Long userId) {
+        User current = currentUserService.getCurrentUser();
+        RoleName actorRole = current.getRole().getName();
+
+        if (actorRole != RoleName.SUPER_ADMIN
+                && actorRole != RoleName.OWNER
+                && actorRole != RoleName.MANAGER) {
+            throw new RuntimeException("Only admin/owner/manager can approve delivery applications");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Application not found"));
+
+        if (user.getRole().getName() != RoleName.DELIVERY_BOY) {
+            throw new RuntimeException("User is not a delivery partner applicant");
+        }
+
+        if (user.getEnabled()) {
+            throw new RuntimeException("Application is already approved");
+        }
+
+        user.setEnabled(true);
+        user = userRepository.save(user);
+
+        auditService.log("DELIVERY_APP_APPROVE", "User", user.getId(),
+                "Delivery partner application approved: " + user.getEmail()
+                        + " (" + user.getFullName() + ")");
+
+        log.info("Delivery partner approved: {}", user.getEmail());
+
+        return mapToResponse(user);
+    }
+
+    @Override
+    public UserResponse rejectDeliveryApplication(Long userId) {
+        User current = currentUserService.getCurrentUser();
+        RoleName actorRole = current.getRole().getName();
+
+        if (actorRole != RoleName.SUPER_ADMIN
+                && actorRole != RoleName.OWNER
+                && actorRole != RoleName.MANAGER) {
+            throw new RuntimeException("Only admin/owner/manager can reject delivery applications");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Application not found"));
+
+        if (user.getRole().getName() != RoleName.DELIVERY_BOY) {
+            throw new RuntimeException("User is not a delivery partner applicant");
+        }
+
+        if (user.getEnabled()) {
+            throw new RuntimeException("Cannot reject an already approved application");
+        }
+
+        // Soft-delete: keep disabled, the user simply cannot log in.
+        userRepository.delete(user);
+
+        auditService.log("DELIVERY_APP_REJECT", "User", userId,
+                "Delivery partner application rejected: " + user.getEmail());
+
+        log.info("Delivery partner rejected: {}", user.getEmail());
+
+        // Return a synthetic response since the entity is deleted.
+        return UserResponse.builder()
+                .id(userId)
+                .fullName(user.getFullName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .city(user.getCity())
+                .vehicleType(user.getVehicleType())
+                .vehicleNumber(user.getVehicleNumber())
+                .role(RoleName.DELIVERY_BOY)
+                .enabled(false)
                 .createdAt(user.getCreatedAt())
                 .build();
     }
