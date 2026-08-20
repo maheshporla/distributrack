@@ -196,15 +196,24 @@ export function DeliveryDetails({
             Delivery Boy
           </p>
           {delivery.deliveryBoyName ? (
-            <>
-              <p className="mt-1 font-medium">{delivery.deliveryBoyName}</p>
-              <p className="text-xs text-muted-foreground">
-                Worker ID: {delivery.deliveryBoyId}
-              </p>
-            </>
+            <div className="space-y-1">
+              <p className="font-medium">{delivery.deliveryBoyName}</p>
+              {delivery.deliveryBoyPhone && (
+                <p className="text-xs text-muted-foreground">
+                  📞 {delivery.deliveryBoyPhone}
+                </p>
+              )}
+              {(delivery.deliveryBoyVehicleType || delivery.deliveryBoyVehicleNumber) && (
+                <p className="text-xs text-muted-foreground">
+                  🚗 {delivery.deliveryBoyVehicleType || ""}
+                  {delivery.deliveryBoyVehicleType && delivery.deliveryBoyVehicleNumber && " · "}
+                  {delivery.deliveryBoyVehicleNumber || ""}
+                </p>
+              )}
+            </div>
           ) : (
             <p className="mt-1 font-medium text-muted-foreground italic">
-              Waiting for a worker to accept
+              Not Assigned
             </p>
           )}
         </div>
@@ -226,7 +235,9 @@ export function DeliveryDetails({
             Vehicle
           </p>
           <p className="mt-1 font-medium">
-            {delivery.vehicleNumber || "Not specified"}
+            {delivery.deliveryBoyVehicleType || delivery.vehicleNumber
+              ? `${delivery.deliveryBoyVehicleType || ""}${delivery.deliveryBoyVehicleType && delivery.vehicleNumber ? " · " : ""}${delivery.vehicleNumber || ""}`
+              : "Not specified"}
           </p>
           {delivery.deliveredAt && (
             <p className="text-xs text-muted-foreground">

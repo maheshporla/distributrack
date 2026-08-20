@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Eye, Route, Search } from "lucide-react";
+import { AlertTriangle, Eye, Route, Search, Navigation } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { useAuthStore } from "@/store/authStore";
 
 import { DELIVERY_STATUS_META } from "@/features/deliveries/deliveryStatus";
 import { DeliveryDetails } from "@/features/deliveries/components/DeliveryDetails";
+import { DeliveryTrackingView } from "@/features/deliveries/components/DeliveryTrackingView";
 
 import {
   DELIVERY_STATUSES,
@@ -21,7 +22,47 @@ import {
   type DeliveryStatus,
 } from "@/types/delivery.types";
 import { cn } from "@/lib/utils";
-type PageView = "list" | "details";
+
+type PageView = "list" | "details" | "tracking";
+
+const STALE_MS = 5 * 60 * 1_000;
+
+function GpsIndicator({ delivery }: { delivery: Delivery }) {
+  const hasCoords =
+    delivery.latitude !== null &&
+    delivery.longitude !== null;
+  const isStale =
+    !delivery.lastLocationAt ||
+    Date.now() - new Date(delivery.lastLocationAt).getTime() > STALE_MS;
+
+  if (!hasCoords) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <span className="size-1.5 rounded-full bg-muted-foreground/30" />
+        GPS Unavailable
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-xs">
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          isStale ? "bg-amber-500" : "bg-green-500",
+        )}
+      />
+      {isStale ? "Stale" : "Live"}
+    </span>
+  );
+}
+
+/** Whether a delivery can be tracked (active GPS location). */
+function canTrack(delivery: Delivery): boolean {
+  return (
+    delivery.deliveryStatus === "ASSIGNED" ||
+    delivery.deliveryStatus === "OUT_FOR_DELIVERY"
+  );
+}
 
 export function DeliveriesPage() {
   const user = useAuthStore((state) => state.user);
@@ -29,16 +70,22 @@ export function DeliveriesPage() {
 
   const canEmergencyReassign =
     role === "SUPER_ADMIN" || role === "OWNER" || role === "MANAGER";
+  const canTrackDelivery =
+    role === "SUPER_ADMIN" || role === "OWNER" || role === "MANAGER";
 
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [searchKeyword, setSearchKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState<DeliveryStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<DeliveryStatus | "all">(
+    "all",
+  );
 
   const [view, setView] = useState<PageView>("list");
-  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(null);
+  const [selectedDelivery, setSelectedDelivery] = useState<Delivery | null>(
+    null,
+  );
   const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [reassigningId, setReassigningId] = useState<number | null>(null);
 
@@ -80,7 +127,8 @@ export function DeliveriesPage() {
       return (
         delivery.orderNumber.toLowerCase().includes(keyword) ||
         delivery.shopkeeperName.toLowerCase().includes(keyword) ||
-        (delivery.deliveryBoyName && delivery.deliveryBoyName.toLowerCase().includes(keyword)) ||
+        (delivery.deliveryBoyName &&
+          delivery.deliveryBoyName.toLowerCase().includes(keyword)) ||
         delivery.deliveryStatus.toLowerCase().includes(keyword) ||
         delivery.deliveryAddress.toLowerCase().includes(keyword)
       );
@@ -104,14 +152,20 @@ export function DeliveriesPage() {
         next,
         failureReason,
       );
-      toast.success(`Delivery marked as ${next.replace(/_/g, " ").toLowerCase()}`);
+      toast.success(
+        `Delivery marked as ${next.replace(/_/g, " ").toLowerCase()}`,
+      );
       setDeliveries((prev) =>
         prev.map((d) => (d.id === updated.id ? updated : d)),
       );
       setSelectedDelivery(updated);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update delivery status");
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update delivery status";
+      toast.error(message);
     } finally {
       setUpdatingStatusId(null);
     }
@@ -137,7 +191,9 @@ export function DeliveriesPage() {
     try {
       setReassigningId(delivery.id);
       await deliveryService.emergencyReassign(delivery.id);
-      toast.success(`Delivery for ${delivery.orderNumber} is now available for re-assignment`);
+      toast.success(
+        `Delivery for ${delivery.orderNumber} is now available for re-assignment`,
+      );
       await loadDeliveries();
     } catch (error) {
       console.error(error);
@@ -148,43 +204,17 @@ export function DeliveriesPage() {
   };
 
   // =========================================================
-  // GPS freshness indicator
-  // =========================================================
-
-  const STALE_MS = 5 * 60 * 1_000;
-  function GpsIndicator({ delivery }: { delivery: Delivery }) {
-    const hasCoords = delivery.latitude !== null && delivery.longitude !== null;
-    const isStale = !delivery.lastLocationAt ||
-      Date.now() - new Date(delivery.lastLocationAt).getTime() > STALE_MS;
-
-    if (!hasCoords) {
-      return (
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <span className="size-1.5 rounded-full bg-muted-foreground/30" />
-          No GPS
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center gap-1 text-xs">
-        <span
-          className={cn(
-            "size-1.5 rounded-full",
-            isStale ? "bg-amber-500" : "bg-green-500",
-          )}
-        />
-        {isStale ? "Stale" : "Live"}
-      </span>
-    );
-  }
-
-  // =========================================================
   // View switching
   // =========================================================
 
   const handleViewDelivery = (delivery: Delivery) => {
     setSelectedDelivery(delivery);
     setView("details");
+  };
+
+  const handleTrackDelivery = (delivery: Delivery) => {
+    setSelectedDelivery(delivery);
+    setView("tracking");
   };
 
   const handleBackToList = () => {
@@ -196,6 +226,19 @@ export function DeliveriesPage() {
     setSearchKeyword("");
     setStatusFilter("all");
   };
+
+  // =========================================================
+  // Tracking View
+  // =========================================================
+
+  if (view === "tracking" && selectedDelivery) {
+    return (
+      <DeliveryTrackingView
+        deliveryId={selectedDelivery.id}
+        onBack={handleBackToList}
+      />
+    );
+  }
 
   // =========================================================
   // Delivery Details Screen
@@ -227,7 +270,7 @@ export function DeliveriesPage() {
             ? "Your assigned deliveries and live tracking."
             : role === "SHOPKEEPER"
               ? "Track the delivery of your orders."
-              : "Monitor deliveries and manage emergency reassignment."
+              : "Monitor deliveries and track live GPS location."
         }
       />
 
@@ -275,7 +318,9 @@ export function DeliveriesPage() {
           />
         ) : isLoading ? (
           <div className="flex min-h-40 items-center justify-center">
-            <p className="text-sm text-muted-foreground">Loading deliveries...</p>
+            <p className="text-sm text-muted-foreground">
+              Loading deliveries...
+            </p>
           </div>
         ) : displayedDeliveries.length === 0 ? (
           <EmptyState
@@ -304,8 +349,8 @@ export function DeliveriesPage() {
               <thead>
                 <tr className="border-b text-left">
                   <th className="px-4 py-3">Order</th>
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Worker</th>
+                  <th className="px-4 py-3">Shopkeeper</th>
+                  <th className="px-4 py-3">Delivery Boy</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">GPS</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -313,22 +358,56 @@ export function DeliveriesPage() {
               </thead>
               <tbody>
                 {displayedDeliveries.map((delivery) => {
-                  const statusMeta = DELIVERY_STATUS_META[delivery.deliveryStatus];
+                  const statusMeta =
+                    DELIVERY_STATUS_META[delivery.deliveryStatus];
+                  const trackable = canTrackDelivery && canTrack(delivery);
 
                   return (
                     <tr key={delivery.id} className="border-b last:border-0">
                       <td className="px-4 py-3">
-                        <span className="font-medium">{delivery.orderNumber}</span>
+                        <span className="font-medium">
+                          {delivery.orderNumber}
+                        </span>
                         <p className="text-xs text-muted-foreground">
                           Delivery #{delivery.id}
                         </p>
                       </td>
 
-                      <td className="px-4 py-3">{delivery.shopkeeperName}</td>
+                      <td className="px-4 py-3">
+                        <div>{delivery.shopkeeperName}</div>
+                        {delivery.shopkeeperPhone && (
+                          <p className="text-xs text-muted-foreground">
+                            {delivery.shopkeeperPhone}
+                          </p>
+                        )}
+                      </td>
 
                       <td className="px-4 py-3">
-                        {delivery.deliveryBoyName ?? (
-                          <span className="text-muted-foreground italic">Unassigned</span>
+                        {delivery.deliveryBoyName ? (
+                          <div>
+                            <div className="font-medium">
+                              {delivery.deliveryBoyName}
+                            </div>
+                            {delivery.deliveryBoyPhone && (
+                              <p className="text-xs text-muted-foreground">
+                                {delivery.deliveryBoyPhone}
+                              </p>
+                            )}
+                            {(delivery.deliveryBoyVehicleType ||
+                              delivery.deliveryBoyVehicleNumber) && (
+                              <p className="text-xs text-muted-foreground">
+                                {delivery.deliveryBoyVehicleType || ""}
+                                {delivery.deliveryBoyVehicleType &&
+                                  delivery.deliveryBoyVehicleNumber &&
+                                  " · "}
+                                {delivery.deliveryBoyVehicleNumber || ""}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic">
+                            Not Assigned
+                          </span>
                         )}
                       </td>
 
@@ -346,17 +425,29 @@ export function DeliveriesPage() {
                         <div className="flex justify-end gap-2">
                           {canEmergencyReassign &&
                             delivery.deliveryStatus === "ASSIGNED" && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleEmergencyReassign(delivery)
+                                }
+                                disabled={reassigningId === delivery.id}
+                                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <AlertTriangle className="mr-1 h-3.5 w-3.5" />
+                                {reassigningId === delivery.id
+                                  ? "Reassigning..."
+                                  : "Reassign"}
+                              </Button>
+                            )}
+                          {trackable && (
                             <Button
-                              variant="outline"
+                              variant="default"
                               size="sm"
-                              onClick={() => handleEmergencyReassign(delivery)}
-                              disabled={reassigningId === delivery.id}
-                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => handleTrackDelivery(delivery)}
                             >
-                              <AlertTriangle className="mr-1 h-3.5 w-3.5" />
-                              {reassigningId === delivery.id
-                                ? "Reassigning..."
-                                : "Emergency Reassign"}
+                              <Navigation className="mr-1 h-3.5 w-3.5" />
+                              Track
                             </Button>
                           )}
                           <Button

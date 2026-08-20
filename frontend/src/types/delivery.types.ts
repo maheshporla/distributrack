@@ -44,6 +44,12 @@ export interface Delivery {
   deliveryBoyId: number | null;
   /** Null when delivery is AVAILABLE (not yet accepted). */
   deliveryBoyName: string | null;
+  /** Delivery boy's phone. Null when no worker assigned. */
+  deliveryBoyPhone: string | null;
+  /** Delivery boy's vehicle type. Null when no worker assigned or not set. */
+  deliveryBoyVehicleType: string | null;
+  /** Delivery boy's vehicle registration number. */
+  deliveryBoyVehicleNumber: string | null;
   shopkeeperId: number;
   shopkeeperName: string;
   shopkeeperPhone: string;

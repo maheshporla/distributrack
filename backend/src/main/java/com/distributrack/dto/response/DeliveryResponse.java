@@ -30,6 +30,15 @@ public class DeliveryResponse {
     /** Null when delivery is AVAILABLE (not yet accepted). */
     private String deliveryBoyName;
 
+    /** Delivery boy's phone. Null when no worker assigned. */
+    private String deliveryBoyPhone;
+
+    /** Delivery boy's vehicle type (Bike, Scooter, etc.). Null when no worker assigned or not set. */
+    private String deliveryBoyVehicleType;
+
+    /** Delivery boy's vehicle registration number. Null when no worker assigned or not set. */
+    private String deliveryBoyVehicleNumber;
+
     // Customer / order summary (carried on the delivery so DELIVERY_BOY
     // and SHOPKEEPER views have it — DELIVERY_BOY is denied /api/orders/**)
     private Long shopkeeperId;
