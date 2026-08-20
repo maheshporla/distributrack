@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ShopkeeperLayout } from "@/components/layout/ShopkeeperLayout";
+import { DeliveryWorkerLayout } from "@/components/layout/DeliveryWorkerLayout";
 import { GuestRoute } from "@/routes/GuestRoute";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { NotFoundPage } from "@/routes/NotFoundPage";
@@ -28,6 +29,7 @@ import { SettingsPage } from "@/features/settings/pages/SettingsPage";
 import { RequireRole } from "@/routes/RequireRole";
 import { UsersManagementPage } from "@/features/users/pages/UsersManagementPage";
 import { FirstAdminSetupPage } from "@/features/setup/pages/FirstAdminSetupPage";
+import { WorkerProfilePage } from "@/features/delivery-workers/pages/WorkerProfilePage";
 
 /**
  * Analytics and Reports are the only Recharts-heavy pages; lazy-loading
@@ -174,7 +176,7 @@ export function AppRouter() {
           path={ROUTES.DELIVERIES}
           element={
             <RequireRole
-              roles={["SUPER_ADMIN", "OWNER", "MANAGER", "DELIVERY_BOY", "SHOPKEEPER"]}
+              roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SHOPKEEPER"]}
             >
               <DeliveriesPage />
             </RequireRole>
@@ -228,7 +230,7 @@ export function AppRouter() {
           path={ROUTES.SETTINGS}
           element={
             <RequireRole
-              roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN", "DELIVERY_BOY", "SHOPKEEPER"]}
+              roles={["SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN", "SHOPKEEPER"]}
             >
               <SettingsPage />
             </RequireRole>
@@ -314,6 +316,50 @@ export function AppRouter() {
           path={ROUTES.SHOPKEEPER_SETTINGS}
           element={
             <RequireRole roles={["SHOPKEEPER"]}>
+              <SettingsPage />
+            </RequireRole>
+          }
+        />
+      </Route>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* Delivery Worker portal — separate layout, DELIVERY_BOY only       */}
+      {/* ---------------------------------------------------------------- */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <DeliveryWorkerLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route
+          path={ROUTES.DELIVERY_PROFILE}
+          element={
+            <RequireRole roles={["DELIVERY_BOY"]}>
+              <WorkerProfilePage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_WORKER_DELIVERIES}
+          element={
+            <RequireRole roles={["DELIVERY_BOY"]}>
+              <DeliveriesPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_WORKER_NOTIFICATIONS}
+          element={
+            <RequireRole roles={["DELIVERY_BOY"]}>
+              <NotificationsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_WORKER_SETTINGS}
+          element={
+            <RequireRole roles={["DELIVERY_BOY"]}>
               <SettingsPage />
             </RequireRole>
           }

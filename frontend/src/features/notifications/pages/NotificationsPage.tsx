@@ -10,9 +10,10 @@ import { cn } from "@/lib/utils";
 
 import { useNotificationStore } from "@/store/notificationStore";
 import {
-  notificationRoute,
+  notificationRouteForRole,
   type NotificationType,
 } from "@/types/notification.types";
+import { useAuthStore } from "@/store/authStore";
 
 const TYPE_LABELS: Record<NotificationType, string> = {
   ORDER_CREATED: "Order",
@@ -38,6 +39,7 @@ export function NotificationsPage() {
   const refresh = useNotificationStore((state) => state.refresh);
   const markAsRead = useNotificationStore((state) => state.markAsRead);
   const markAllAsRead = useNotificationStore((state) => state.markAllAsRead);
+  const userRole = useAuthStore((state) => state.user?.role);
 
   const handleMarkAllRead = async () => {
     try {
@@ -97,7 +99,7 @@ export function NotificationsPage() {
             {notifications.map((notification) => (
               <li key={notification.id}>
                 <Link
-                  to={notificationRoute(notification.type)}
+                  to={notificationRouteForRole(notification.type, userRole)}
                   onClick={() => void handleOpen(notification.id, notification.read)}
                   className={cn(
                     "flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/50",

@@ -94,10 +94,10 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
         label: "Deliveries",
         path: ROUTES.DELIVERIES,
         icon: Route,
-        // DELIVERY_BOY sees own assignments, SHOPKEEPER sees own orders'
-        // deliveries (enforced server-side); SALESMAN has no delivery
-        // access — matches SecurityConfig for /api/delivery/**.
-        roles: ["SUPER_ADMIN", "OWNER", "MANAGER", "DELIVERY_BOY", "SHOPKEEPER"],
+        // DELIVERY_BOY has their own portal (/delivery/*); SHOPKEEPER sees
+        // own orders' deliveries (enforced server-side); SALESMAN has no
+        // delivery access — matches SecurityConfig for /api/delivery/**.
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER", "SHOPKEEPER"],
       },
     ],
   },

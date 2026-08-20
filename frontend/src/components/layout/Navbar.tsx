@@ -15,11 +15,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { SidebarNav } from "@/components/layout/SidebarNav";
+import { DeliveryWorkerSidebar } from "@/components/layout/DeliveryWorkerSidebar";
+import { ShopkeeperSidebar } from "@/components/layout/ShopkeeperSidebar";
 import { ROUTES } from "@/constants/routes.constants";
 import { getInitials, formatRelativeTime } from "@/lib/formatters";
 import { useAuthStore } from "@/store/authStore";
 import { useNotificationStore, startNotificationPolling, stopNotificationPolling } from "@/store/notificationStore";
-import { notificationRoute } from "@/types/notification.types";
+import { notificationRouteForRole } from "@/types/notification.types";
 import { useLogout } from "@/features/auth/hooks/useLogout";
 
 /**
@@ -62,7 +64,13 @@ export function Navbar() {
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
           </SheetHeader>
-          <SidebarNav onNavigate={() => setIsMobileNavOpen(false)} />
+          {user?.role === "DELIVERY_BOY" ? (
+            <DeliveryWorkerSidebar onNavigate={() => setIsMobileNavOpen(false)} />
+          ) : user?.role === "SHOPKEEPER" ? (
+            <ShopkeeperSidebar onNavigate={() => setIsMobileNavOpen(false)} />
+          ) : (
+            <SidebarNav onNavigate={() => setIsMobileNavOpen(false)} />
+          )}
         </SheetContent>
       </Sheet>
 
@@ -132,7 +140,7 @@ export function Navbar() {
                 {notifications.slice(0, 5).map((notification) => (
                   <DropdownMenuItem key={notification.id} asChild>
                     <Link
-                      to={notificationRoute(notification.type)}
+                      to={notificationRouteForRole(notification.type, user?.role)}
                       className="flex items-start gap-2.5 px-3 py-2"
                     >
                       <span
@@ -162,7 +170,7 @@ export function Navbar() {
             <DropdownMenuSeparator />
 
             <DropdownMenuItem asChild>
-              <Link to={ROUTES.NOTIFICATIONS} className="justify-center font-medium">
+              <Link to={user?.role === "DELIVERY_BOY" ? ROUTES.DELIVERY_WORKER_NOTIFICATIONS : ROUTES.NOTIFICATIONS} className="justify-center font-medium">
                 View all notifications
               </Link>
             </DropdownMenuItem>
@@ -195,13 +203,13 @@ export function Navbar() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link to={ROUTES.SETTINGS}>
+              <Link to={user?.role === "DELIVERY_BOY" ? ROUTES.DELIVERY_PROFILE : ROUTES.SETTINGS}>
                 <User />
                 Profile
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link to={ROUTES.SETTINGS}>
+              <Link to={user?.role === "DELIVERY_BOY" ? ROUTES.DELIVERY_WORKER_SETTINGS : ROUTES.SETTINGS}>
                 <Settings />
                 Settings
               </Link>

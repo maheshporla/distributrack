@@ -56,3 +56,22 @@ export function notificationRoute(type: NotificationType): string {
   // ORDER_* family
   return "/orders";
 }
+
+/**
+ * Role-aware notification route. Delivery workers use their own portal
+ * paths, while all other roles use the admin paths.
+ */
+export function notificationRouteForRole(
+  type: NotificationType,
+  role?: string,
+): string {
+  if (role === "DELIVERY_BOY") {
+    if (type.startsWith("DELIVERY_")) return "/delivery/deliveries";
+    if (type === "LOW_STOCK") return "/delivery/profile";
+    if (type.startsWith("PAYMENT_") || type === "INVOICE_AVAILABLE") {
+      return "/delivery/profile";
+    }
+    return "/delivery/notifications";
+  }
+  return notificationRoute(type);
+}

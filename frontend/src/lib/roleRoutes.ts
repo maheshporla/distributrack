@@ -15,7 +15,7 @@ export function defaultRouteForRole(role: RoleName | undefined): string {
     case "MANAGER":
       return ROUTES.DASHBOARD;
     case "DELIVERY_BOY":
-      return ROUTES.DELIVERIES;
+      return ROUTES.DELIVERY_PROFILE;
     case "SHOPKEEPER":
       return ROUTES.SHOPKEEPER_DASHBOARD;
     case "SALESMAN":
