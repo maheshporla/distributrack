@@ -86,6 +86,14 @@ export const ENDPOINTS = {
     START: (id: string | number) => `/delivery-batches/${id}/start`,
     COMPLETE: (id: string | number) => `/delivery-batches/${id}/complete`,
   },
+  /** Backend controller is mapped at /api/delivery-earnings. */
+  DELIVERY_EARNINGS: {
+    MY_DASHBOARD: "/delivery-earnings/my/dashboard",
+    MY_HISTORY: "/delivery-earnings/my/history",
+    ADMIN_DASHBOARD: "/delivery-earnings/admin/dashboard",
+    ADMIN_BOY_DASHBOARD: (id: string | number) => `/delivery-earnings/admin/${id}/dashboard`,
+    ADMIN_BOY_HISTORY: (id: string | number) => `/delivery-earnings/admin/${id}/history`,
+  },
   /** Backend controller is mapped at /api/delivery (singular). */
   DELIVERIES: {
     BASE: "/delivery",

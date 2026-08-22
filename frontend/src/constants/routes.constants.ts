@@ -43,6 +43,7 @@ export const ROUTES = {
   DELIVERY_WORKERS: "/delivery-workers",
   DELIVERY_APPLICATIONS: "/delivery-applications",
   DELIVERY_AREAS: "/delivery-areas",
+  DELIVERY_EARNINGS: "/delivery-earnings",
   DELIVERIES: "/deliveries",
   USERS: "/users",
   INVOICES: "/invoices",

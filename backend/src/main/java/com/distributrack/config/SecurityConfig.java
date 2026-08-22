@@ -236,6 +236,17 @@ public class SecurityConfig {
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN", "SHOPKEEPER")
 
                         // =====================================================
+                        // Delivery Earnings
+                        // =====================================================
+                        // Delivery boy: own earnings dashboard/history
+                        .requestMatchers(HttpMethod.GET, "/api/delivery-earnings/my/**")
+                        .hasRole("DELIVERY_BOY")
+
+                        // Admin: aggregated earnings dashboard and per-boy drill-down
+                        .requestMatchers(HttpMethod.GET, "/api/delivery-earnings/admin/**")
+                        .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
+
+                        // =====================================================
                         // Delivery Batches (area/route assignment)
                         // =====================================================
                         // Delivery boy: view own batches

@@ -15,6 +15,7 @@ import {
   Bell,
   Settings,
   UserCheck,
+  IndianRupee,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes.constants";
 import type { NavItem } from "@/types/ui.types";
@@ -106,6 +107,12 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
         // own orders' deliveries (enforced server-side); SALESMAN has no
         // delivery access — matches SecurityConfig for /api/delivery/**.
         roles: ["SUPER_ADMIN", "OWNER", "MANAGER", "SHOPKEEPER"],
+      },
+      {
+        label: "Delivery Earnings",
+        path: ROUTES.DELIVERY_EARNINGS,
+        icon: IndianRupee,
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
       },
     ],
   },

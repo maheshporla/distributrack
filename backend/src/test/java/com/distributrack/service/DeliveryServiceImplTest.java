@@ -9,10 +9,12 @@ import com.distributrack.enums.DeliveryStatus;
 import com.distributrack.enums.OrderStatus;
 import com.distributrack.enums.RoleName;
 import com.distributrack.enums.WorkerAvailability;
+import com.distributrack.repository.DeliveryBatchRepository;
 import com.distributrack.repository.DeliveryRepository;
 import com.distributrack.repository.OrderRepository;
 import com.distributrack.repository.UserRepository;
 import com.distributrack.security.CurrentUserService;
+import com.distributrack.service.DeliveryEarningService;
 import com.distributrack.service.NotificationService;
 import com.distributrack.service.impl.DeliveryServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,17 +33,21 @@ class DeliveryServiceImplTest {
     private final DeliveryRepository deliveryRepository = mock(DeliveryRepository.class);
     private final OrderRepository orderRepository = mock(OrderRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
+    private final DeliveryBatchRepository deliveryBatchRepository = mock(DeliveryBatchRepository.class);
     private final CurrentUserService currentUserService = mock(CurrentUserService.class);
     private final NotificationService notificationService = mock(NotificationService.class);
     private final AuditService auditService = mock(AuditService.class);
+    private final DeliveryEarningService deliveryEarningService = mock(DeliveryEarningService.class);
 
     private final DeliveryServiceImpl deliveryService = new DeliveryServiceImpl(
             deliveryRepository,
             orderRepository,
             userRepository,
+            deliveryBatchRepository,
             currentUserService,
             notificationService,
-            auditService
+            auditService,
+            deliveryEarningService
     );
 
     private User boy;

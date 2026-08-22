@@ -12,6 +12,8 @@ import {
   ArrowRight,
   Wifi,
   WifiOff,
+  IndianRupee,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +25,8 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 import { deliveryService } from "@/services/api/deliveryService";
+import { deliveryEarningService } from "@/services/api/deliveryEarningService";
+import type { DeliveryEarningsDashboard } from "@/types/deliveryEarning.types";
 import {
   workerService,
   type WorkerAvailability,
@@ -52,17 +56,21 @@ export function DeliveryBoyDashboardPage() {
   const [availability, setAvailability] =
     useState<WorkerAvailability>("OFFLINE");
   const [togglingAvailability, setTogglingAvailability] = useState(false);
+  const [earningsDashboard, setEarningsDashboard] =
+    useState<DeliveryEarningsDashboard | null>(null);
 
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       setLoadError(null);
-      const [myDeliveries, available] = await Promise.all([
+      const [myDeliveries, available, earnings] = await Promise.all([
         deliveryService.getAllDeliveries(),
         deliveryService.getAvailableDeliveries(),
+        deliveryEarningService.getMyDashboard().catch(() => null),
       ]);
       setDeliveries(myDeliveries);
       setAvailableCount(available.length);
+      setEarningsDashboard(earnings);
     } catch (error) {
       console.error(error);
       setLoadError("Failed to load dashboard data");
@@ -278,6 +286,124 @@ export function DeliveryBoyDashboardPage() {
           isLoading={isLoading}
         />
       </div>
+
+      {/* --- Earnings Summary --- */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Card className="border-green-200 bg-green-50/50 dark:border-green-900 dark:bg-green-950/20">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+              <IndianRupee className="h-4 w-4" />
+              Today's Earnings
+            </div>
+            <p className="mt-1 text-2xl font-bold text-green-700 dark:text-green-400">
+              {formatINR(earningsDashboard?.todayEarnings ?? 0)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {earningsDashboard?.todayDeliveries ?? 0} deliveries · {(Number(earningsDashboard?.todayDistanceKm ?? 0)).toFixed(1)} km
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-400">
+              <Calendar className="h-4 w-4" />
+              This Month
+            </div>
+            <p className="mt-1 text-2xl font-bold text-blue-700 dark:text-blue-400">
+              {formatINR(earningsDashboard?.monthEarnings ?? 0)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {earningsDashboard?.monthDeliveries ?? 0} deliveries · {(Number(earningsDashboard?.monthDistanceKm ?? 0)).toFixed(1)} km
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-400">
+              <Truck className="h-4 w-4" />
+              Total Deliveries
+            </div>
+            <p className="mt-1 text-2xl font-bold text-purple-700 dark:text-purple-400">
+              {earningsDashboard?.allTimeDeliveries ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              All time
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+              <MapPin className="h-4 w-4" />
+              Total Distance
+            </div>
+            <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-400">
+              {(Number(earningsDashboard?.allTimeDistanceKm ?? 0)).toFixed(1)} km
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {formatINR(earningsDashboard?.allTimeEarnings ?? 0)} earned
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* --- Today's Earnings Table --- */}
+      {earningsDashboard?.todaysEarnings &&
+        earningsDashboard.todaysEarnings.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IndianRupee className="h-5 w-5 text-green-500" />
+                Today's Earnings ({earningsDashboard.todaysEarnings.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="pb-2 font-medium">Order</th>
+                      <th className="pb-2 font-medium">Shop</th>
+                      <th className="pb-2 font-medium text-right">Distance</th>
+                      <th className="pb-2 font-medium text-right">Bill</th>
+                      <th className="pb-2 font-medium text-right">Earning</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {earningsDashboard.todaysEarnings.map((e) => (
+                      <tr key={e.earningId} className="border-b last:border-0">
+                        <td className="py-2 font-medium">{e.orderNumber}</td>
+                        <td className="py-2 text-muted-foreground">
+                          {e.shopName || e.shopkeeperName}
+                        </td>
+                        <td className="py-2 text-right">
+                          {Number(e.distanceKm).toFixed(1)} km
+                        </td>
+                        <td className="py-2 text-right">{formatINR(e.orderAmount)}</td>
+                        <td className="py-2 text-right font-semibold text-green-600">
+                          {formatINR(e.earningAmount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t font-semibold">
+                      <td colSpan={4} className="py-2 text-right">Total</td>
+                      <td className="py-2 text-right text-green-600">
+                        {formatINR(
+                          earningsDashboard.todaysEarnings.reduce(
+                            (sum, e) => sum + Number(e.earningAmount),
+                            0,
+                          ),
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
       {/* --- Recent Deliveries --- */}
       <Card>

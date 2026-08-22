@@ -3,17 +3,21 @@ package com.distributrack.service.impl;
 import com.distributrack.dto.request.DeliveryRequest;
 import com.distributrack.dto.response.DeliveryResponse;
 import com.distributrack.entity.Delivery;
+import com.distributrack.entity.DeliveryBatch;
 import com.distributrack.entity.Order;
 import com.distributrack.entity.User;
+import com.distributrack.enums.DeliveryBatchStatus;
 import com.distributrack.enums.DeliveryStatus;
 import com.distributrack.enums.OrderStatus;
 import com.distributrack.enums.RoleName;
 import com.distributrack.enums.WorkerAvailability;
+import com.distributrack.repository.DeliveryBatchRepository;
 import com.distributrack.repository.DeliveryRepository;
 import com.distributrack.repository.OrderRepository;
 import com.distributrack.repository.UserRepository;
 import com.distributrack.security.CurrentUserService;
 import com.distributrack.service.AuditService;
+import com.distributrack.service.DeliveryEarningService;
 import com.distributrack.service.DeliveryService;
 import com.distributrack.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -33,9 +37,11 @@ public class DeliveryServiceImpl implements DeliveryService {
     private final DeliveryRepository deliveryRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final DeliveryBatchRepository deliveryBatchRepository;
     private final CurrentUserService currentUserService;
     private final NotificationService notificationService;
     private final AuditService auditService;
+    private final DeliveryEarningService deliveryEarningService;
 
     @Override
     @Transactional
@@ -173,6 +179,14 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         // Worker stays AVAILABLE regardless of delivery status —
         // they can handle multiple simultaneous deliveries.
+
+        // Create earning when delivery is completed.
+        if (nextStatus == DeliveryStatus.DELIVERED) {
+            deliveryEarningService.createEarningIfNotExists(delivery);
+        }
+
+        // Auto-complete batch when all deliveries are terminal (DELIVERED or FAILED).
+        checkAndCompleteBatchIfNeeded(delivery);
 
         // Notify the shopkeeper about the delivery status.
         switch (nextStatus) {
@@ -480,6 +494,33 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         } catch (Exception e) {
             log.error("Failed to process FIFO queue: {}", e.getMessage());
+        }
+    }
+
+    // ===================================================================
+    // Batch auto-completion: mark batch COMPLETED when all deliveries
+    // in the batch are in a terminal state (DELIVERED or FAILED).
+    // ===================================================================
+
+    private void checkAndCompleteBatchIfNeeded(Delivery delivery) {
+        DeliveryBatch batch = delivery.getDeliveryBatch();
+        if (batch == null) return;
+        if (batch.getStatus() == DeliveryBatchStatus.COMPLETED
+                || batch.getStatus() == DeliveryBatchStatus.CANCELLED) return;
+
+        List<Delivery> batchDeliveries = deliveryRepository.findByDeliveryBatch(batch);
+
+        boolean allTerminal = batchDeliveries.stream()
+                .allMatch(d -> d.getDeliveryStatus() == DeliveryStatus.DELIVERED
+                        || d.getDeliveryStatus() == DeliveryStatus.FAILED
+                        || d.getDeliveryStatus() == DeliveryStatus.CANCELLED);
+
+        if (allTerminal && !batchDeliveries.isEmpty()) {
+            batch.setStatus(DeliveryBatchStatus.COMPLETED);
+            batch.setCompletedAt(LocalDateTime.now());
+            deliveryBatchRepository.save(batch);
+            log.info("[BATCH] Auto-completed batch {} — all {} deliveries terminal",
+                    batch.getBatchNumber(), batchDeliveries.size());
         }
     }
 

@@ -35,6 +35,7 @@ import { DeliveryBoyDashboardPage } from "@/features/delivery-workers/pages/Deli
 import { DeliveryBatchDetailPage } from "@/features/delivery-areas/pages/DeliveryBatchDetailPage";
 import { AvailableDeliveriesPage } from "@/features/delivery-workers/pages/AvailableDeliveriesPage";
 import { DeliveryPartnerApplicationsPage } from "@/features/delivery-workers/pages/DeliveryPartnerApplicationsPage";
+import { DeliveryEarningsPage } from "@/features/delivery-earnings/pages/DeliveryEarningsPage";
 
 /**
  * Analytics and Reports are the only Recharts-heavy pages; lazy-loading
@@ -262,6 +263,14 @@ export function AppRouter() {
           element={
             <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
               <DeliveryPartnerApplicationsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_EARNINGS}
+          element={
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+              <DeliveryEarningsPage />
             </RequireRole>
           }
         />
