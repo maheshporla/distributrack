@@ -48,15 +48,15 @@ public class TwilioSmsProvider implements SmsProvider {
 
         try {
             Twilio.init(accountSid, authToken);
-            Message.creator(
+            Message twilioMsg = Message.creator(
                     new PhoneNumber(recipient),
                     new PhoneNumber(fromPhoneNumber),
                     message
             ).create();
 
-            log.info("[SMS] sent to {} via Twilio", recipient);
+            log.info("[SMS] Twilio message accepted: SID={}", twilioMsg.getSid());
         } catch (Exception ex) {
-            log.warn("[SMS] failed to send to {} via Twilio: {}", recipient, ex.getMessage());
+            log.warn("[SMS] Twilio delivery failed: {}", ex.getMessage());
         }
     }
 

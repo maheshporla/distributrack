@@ -236,6 +236,24 @@ public class SecurityConfig {
                         .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER", "SALESMAN", "SHOPKEEPER")
 
                         // =====================================================
+                        // Delivery Batches (area/route assignment)
+                        // =====================================================
+                        // Delivery boy: view own batches
+                        .requestMatchers(HttpMethod.GET, "/api/delivery-batches/my/**")
+                        .hasRole("DELIVERY_BOY")
+
+                        // Delivery boy: start/complete own batch
+                        .requestMatchers(HttpMethod.POST, "/api/delivery-batches/*/start")
+                        .hasRole("DELIVERY_BOY")
+
+                        .requestMatchers(HttpMethod.POST, "/api/delivery-batches/*/complete")
+                        .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER", "DELIVERY_BOY")
+
+                        // Admin: create/list/preview/details
+                        .requestMatchers("/api/delivery-batches/**")
+                        .hasAnyRole("SUPER_ADMIN", "OWNER", "MANAGER")
+
+                        // =====================================================
                         // Reports / Analytics / Dashboard — business-wide
                         // =====================================================
                         .requestMatchers(

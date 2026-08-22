@@ -1,6 +1,7 @@
 package com.distributrack.repository;
 
 import com.distributrack.entity.Delivery;
+import com.distributrack.entity.DeliveryBatch;
 import com.distributrack.entity.Order;
 import com.distributrack.entity.User;
 import com.distributrack.enums.DeliveryStatus;
@@ -21,6 +22,8 @@ public interface DeliveryRepository extends JpaRepository<Delivery, Long> {
     List<Delivery> findByDeliveryBoy(User deliveryBoy);
 
     List<Delivery> findByDeliveryStatus(DeliveryStatus deliveryStatus);
+
+    List<Delivery> findByDeliveryBatch(DeliveryBatch batch);
 
     /**
      * Find a delivery by ID with PESSIMISTIC_WRITE lock.

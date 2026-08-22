@@ -77,6 +77,16 @@ public class Delivery {
     @Column
     private LocalDateTime deliveredAt;
 
+    // --- Area batch assignment ---
+
+    /**
+     * Nullable — null when the delivery is not part of any area batch.
+     * Set when admin assigns deliveries to a DeliveryBatch.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "delivery_batch_id")
+    private DeliveryBatch deliveryBatch;
+
     // --- Cash on Delivery collection tracking ---
 
     @Column(name = "cod_collected")

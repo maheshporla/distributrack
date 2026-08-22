@@ -7,6 +7,7 @@ import {
   ShoppingCart,
   Truck,
   Route,
+  MapPin,
   FileText,
   CreditCard,
   BarChart3,
@@ -89,6 +90,12 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
         icon: Truck,
         // Staff management is SA / OWNER / MANAGER only — matches the
         // /api/users write rules in SecurityConfig.
+        roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
+      },
+      {
+        label: "Delivery Areas",
+        path: ROUTES.DELIVERY_AREAS,
+        icon: MapPin,
         roles: ["SUPER_ADMIN", "OWNER", "MANAGER"],
       },
       {

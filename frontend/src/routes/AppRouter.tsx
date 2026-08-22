@@ -22,6 +22,7 @@ import { OrdersPage } from "@/features/orders/pages/OrdersPage";
 import { CustomersPage } from "@/features/customers/pages/CustomersPage";
 import { DeliveryWorkersPage } from "@/features/delivery-workers/pages/DeliveryWorkersPage";
 import { DeliveriesPage } from "@/features/deliveries/pages/DeliveriesPage";
+import { DeliveryAreasPage } from "@/features/delivery-areas/pages/DeliveryAreasPage";
 import { PaymentsPage } from "@/features/payments/pages/PaymentsPage";
 import { InvoicesPage } from "@/features/invoices/pages/InvoicesPage";
 import { NotificationsPage } from "@/features/notifications/pages/NotificationsPage";
@@ -31,6 +32,7 @@ import { UsersManagementPage } from "@/features/users/pages/UsersManagementPage"
 import { FirstAdminSetupPage } from "@/features/setup/pages/FirstAdminSetupPage";
 import { WorkerProfilePage } from "@/features/delivery-workers/pages/WorkerProfilePage";
 import { DeliveryBoyDashboardPage } from "@/features/delivery-workers/pages/DeliveryBoyDashboardPage";
+import { DeliveryBatchDetailPage } from "@/features/delivery-areas/pages/DeliveryBatchDetailPage";
 import { AvailableDeliveriesPage } from "@/features/delivery-workers/pages/AvailableDeliveriesPage";
 import { DeliveryPartnerApplicationsPage } from "@/features/delivery-workers/pages/DeliveryPartnerApplicationsPage";
 
@@ -172,6 +174,14 @@ export function AppRouter() {
           element={
             <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
               <DeliveryWorkersPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_AREAS}
+          element={
+            <RequireRole roles={["SUPER_ADMIN", "OWNER", "MANAGER"]}>
+              <DeliveryAreasPage />
             </RequireRole>
           }
         />
@@ -348,6 +358,14 @@ export function AppRouter() {
           element={
             <RequireRole roles={["DELIVERY_BOY"]}>
               <DeliveryBoyDashboardPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path={ROUTES.DELIVERY_WORKER_BATCH}
+          element={
+            <RequireRole roles={["DELIVERY_BOY"]}>
+              <DeliveryBatchDetailPage />
             </RequireRole>
           }
         />

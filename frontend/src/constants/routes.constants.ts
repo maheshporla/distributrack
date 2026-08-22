@@ -26,6 +26,7 @@ export const ROUTES = {
 
   // Delivery Worker portal (separate from admin)
   DELIVERY_WORKER_DASHBOARD: "/delivery/dashboard",
+  DELIVERY_WORKER_BATCH: "/delivery/batch",
   DELIVERY_WORKER_AVAILABLE: "/delivery/available",
   DELIVERY_PROFILE: "/delivery/profile",
   DELIVERY_WORKER_DELIVERIES: "/delivery/deliveries",
@@ -41,6 +42,7 @@ export const ROUTES = {
   ORDERS: "/orders",
   DELIVERY_WORKERS: "/delivery-workers",
   DELIVERY_APPLICATIONS: "/delivery-applications",
+  DELIVERY_AREAS: "/delivery-areas",
   DELIVERIES: "/deliveries",
   USERS: "/users",
   INVOICES: "/invoices",

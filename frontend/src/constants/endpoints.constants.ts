@@ -76,6 +76,16 @@ export const ENDPOINTS = {
     BY_SHOPKEEPER: (shopkeeperId: string | number) => `/orders/shopkeeper/${shopkeeperId}`,
     BY_STATUS: (status: string) => `/orders/status/${status}`,
   },
+  /** Backend controller is mapped at /api/delivery-batches. */
+  DELIVERY_BATCHES: {
+    BASE: "/delivery-batches",
+    BY_ID: (id: string | number) => `/delivery-batches/${id}`,
+    PREVIEW: (params: string) => `/delivery-batches/preview?${params}`,
+    MY_ACTIVE: "/delivery-batches/my/active",
+    MY: "/delivery-batches/my",
+    START: (id: string | number) => `/delivery-batches/${id}/start`,
+    COMPLETE: (id: string | number) => `/delivery-batches/${id}/complete`,
+  },
   /** Backend controller is mapped at /api/delivery (singular). */
   DELIVERIES: {
     BASE: "/delivery",
