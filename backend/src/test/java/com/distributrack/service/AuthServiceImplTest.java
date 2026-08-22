@@ -188,6 +188,38 @@ class AuthServiceImplTest {
     }
 
     @Test
+    void forgotPasswordOtpRecordHasNullToken() {
+
+        // Regression test: OTP phase creates a PasswordResetToken with token=null.
+        // In production MySQL, the token column was originally NOT NULL.
+        // Hibernate ddl-auto=update cannot drop NOT NULL on MySQL.
+        // This caused INSERT failures: "Column 'token' cannot be null".
+        // The fix adds ALTER TABLE ... MODIFY COLUMN token VARCHAR(500) NULL
+        // to SchemaInitializer.
+
+        User user = testUser();
+        when(userRepository.findByEmail("test@test.com"))
+                .thenReturn(Optional.of(user));
+        when(passwordResetTokenRepository.deleteByUserId(10L)).thenReturn(0);
+        when(passwordResetTokenRepository.save(any(PasswordResetToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed-otp");
+
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("test@test.com");
+
+        authService.forgotPassword(request);
+
+        // Verify the saved record has token=null (OTP phase, not reset-token phase)
+        verify(passwordResetTokenRepository).save(argThat(record -> {
+            PasswordResetToken token = (PasswordResetToken) record;
+            return token.getToken() == null
+                    && token.getOtpHash() != null
+                    && token.getUser() != null;
+        }));
+    }
+
+    @Test
     void forgotPasswordReturnsSameMessageForNonExistingEmail() {
 
         when(userRepository.findByEmail("unknown@test.com"))

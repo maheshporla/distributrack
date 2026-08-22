@@ -33,6 +33,13 @@ public class SchemaInitializer implements CommandLineRunner {
                 "ALTER TABLE deliveries MODIFY COLUMN delivery_boy_id BIGINT NULL"
             );
 
+            // 2. Make password_reset_tokens.token nullable — the OTP flow
+            //    creates records with token=NULL (token is only set after
+            //    OTP verification). Hibernate cannot drop NOT NULL on MySQL.
+            stmt.execute(
+                "ALTER TABLE password_reset_tokens MODIFY COLUMN token VARCHAR(500) NULL"
+            );
+
             // 2. Add worker availability column if missing.
             var rs = conn.getMetaData().getColumns(
                     null, null, "users", "availability");

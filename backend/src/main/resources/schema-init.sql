@@ -2,6 +2,11 @@
 -- cannot drop on MySQL. This runs on every startup (IFNULL is idempotent).
 ALTER TABLE deliveries MODIFY COLUMN delivery_boy_id BIGINT NULL;
 
+-- Fix password_reset_tokens.token NOT NULL constraint — OTP flow creates
+-- records with token=NULL (token is only set after OTP verification).
+-- Hibernate ddl-auto=update cannot drop NOT NULL on MySQL.
+ALTER TABLE password_reset_tokens MODIFY COLUMN token VARCHAR(500) NULL;
+
 -- Add worker availability column (if not already present).
 -- AVAILABLE: can receive new deliveries
 -- BUSY:      currently delivering
