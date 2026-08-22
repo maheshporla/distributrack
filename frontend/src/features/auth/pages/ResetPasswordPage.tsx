@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { AuthCard } from "@/features/auth/components/AuthCard";
 import { PasswordInput } from "@/components/shared/PasswordInput";
 import { Button } from "@/components/ui/button";
@@ -16,16 +16,19 @@ import {
 import { CheckCircle, AlertTriangle } from "lucide-react";
 
 /**
- * /reset-password?token=...
+ * /reset-password
  *
- * Accepts a reset token from the email link. Validates the token on
- * submit and sets the new password. The token is passed as a URL query
- * parameter — the backend validates it server-side.
+ * Accepts a reset token from the OTP verification step (via navigation state).
+ * Validates the token on submit and sets the new password.
+ *
+ * If no resetToken is in state, the user sees an invalid-link page and is
+ * directed back to the forgot-password flow.
  */
 export function ResetPasswordPage() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get("token");
+  const location = useLocation();
+  const resetToken = (location.state as { resetToken?: string } | null)
+    ?.resetToken;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resetComplete, setResetComplete] = useState(false);
 
@@ -38,8 +41,8 @@ export function ResetPasswordPage() {
     defaultValues: { password: "", confirmPassword: "" },
   });
 
-  // No token in URL — invalid link
-  if (!token) {
+  // No resetToken in state — invalid access
+  if (!resetToken) {
     return (
       <AuthCard
         title="Invalid reset link"
@@ -61,8 +64,8 @@ export function ResetPasswordPage() {
             <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
           </div>
           <p className="text-sm text-muted-foreground text-center">
-            The reset link in your URL is missing or malformed. Please check
-            the link from your email and try again.
+            No reset token found. Please complete the OTP verification flow
+            first.
           </p>
         </div>
       </AuthCard>
@@ -104,12 +107,14 @@ export function ResetPasswordPage() {
   const onSubmit = async (values: ResetPasswordFormValues) => {
     setIsSubmitting(true);
     try {
-      await authService.resetPassword(token, values.password);
+      await authService.resetPassword(resetToken, values.password);
       setResetComplete(true);
       toast.success("Password reset successfully");
     } catch (error) {
       const apiError = error as ApiError;
-      toast.error(apiError.message || "Reset failed. The link may have expired.");
+      toast.error(
+        apiError.message || "Reset failed. The token may have expired.",
+      );
     } finally {
       setIsSubmitting(false);
     }

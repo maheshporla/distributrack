@@ -7,6 +7,8 @@ import type {
   RegisterPayload,
   UserProfile,
   ChangePasswordPayload,
+  VerifyResetOtpPayload,
+  VerifyResetOtpResponse,
 } from "@/types/auth.types";
 
 /**
@@ -77,9 +79,9 @@ export const authService = {
   },
 
   /**
-   * Request a password reset link. The backend sends an email with a
-   * secure token link. Returns a generic success message regardless of
-   * whether the email exists — prevents user enumeration.
+   * Request a password reset OTP. The backend sends an SMS OTP to the
+   * registered phone number. Returns a generic success message regardless
+   * of whether the email exists — prevents user enumeration.
    */
   async forgotPassword(email: string): Promise<string> {
     const response = await axiosInstance.post<string>(
@@ -90,12 +92,26 @@ export const authService = {
   },
 
   /**
-   * Reset the password using a valid token from the email link.
+   * Verify the OTP received via SMS. Returns a resetToken on success
+   * that must be used with resetPassword.
    */
-  async resetPassword(token: string, newPassword: string): Promise<string> {
+  async verifyResetOtp(
+    payload: VerifyResetOtpPayload,
+  ): Promise<VerifyResetOtpResponse> {
+    const response = await axiosInstance.post<VerifyResetOtpResponse>(
+      ENDPOINTS.AUTH.VERIFY_RESET_OTP,
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
+   * Reset the password using a valid reset token from OTP verification.
+   */
+  async resetPassword(resetToken: string, newPassword: string): Promise<string> {
     const response = await axiosInstance.post<string>(
       ENDPOINTS.AUTH.RESET_PASSWORD,
-      { token, newPassword },
+      { resetToken, newPassword },
     );
     return response.data;
   },

@@ -19,6 +19,7 @@ export const ENDPOINTS = {
     CHANGE_PASSWORD: "/auth/change-password",
     PROFILE: "/auth/profile",
     FORGOT_PASSWORD: "/auth/forgot-password",
+    VERIFY_RESET_OTP: "/auth/verify-reset-otp",
     RESET_PASSWORD: "/auth/reset-password",
   },
   PRODUCTS: {

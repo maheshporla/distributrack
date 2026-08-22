@@ -4,6 +4,7 @@ import com.distributrack.dto.request.*;
 import com.distributrack.dto.response.AuthResponse;
 import com.distributrack.dto.response.RefreshTokenResponse;
 import com.distributrack.dto.response.UserResponse;
+import com.distributrack.dto.response.VerifyResetOtpResponse;
 import com.distributrack.security.JwtService;
 import com.distributrack.service.AuthService;
 import jakarta.validation.Valid;
@@ -89,6 +90,13 @@ public class AuthController {
             @Valid @RequestBody ForgotPasswordRequest request) {
 
         return authService.forgotPassword(request);
+    }
+
+    @PostMapping("/verify-reset-otp")
+    public VerifyResetOtpResponse verifyResetOtp(
+            @Valid @RequestBody VerifyResetOtpRequest request) {
+
+        return authService.verifyResetOtp(request);
     }
 
     @PostMapping("/reset-password")

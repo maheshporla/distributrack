@@ -24,14 +24,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import com.distributrack.dto.request.ForgotPasswordRequest;
 import com.distributrack.dto.request.ResetPasswordRequest;
+import com.distributrack.dto.request.VerifyResetOtpRequest;
 import com.distributrack.entity.PasswordResetToken;
 import com.distributrack.repository.PasswordResetTokenRepository;
 
-import com.distributrack.notification.EmailService;
+import com.distributrack.notification.SmsService;
+import com.distributrack.dto.response.VerifyResetOtpResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.UUID;
 import java.time.LocalDateTime;
 
@@ -39,7 +42,7 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
-    private final EmailService emailService;
+    private final SmsService smsService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -179,86 +182,198 @@ public class AuthServiceImpl implements AuthService {
 
         userRepository.save(user);
     }
-    @Value("${app.frontend.url:http://localhost:5173}")
-    private String frontendUrl;
+    private static final int OTP_LENGTH = 6;
+    private static final int OTP_MIN = 100000;
+    private static final int OTP_MAX = 999999;
+    private static final int OTP_EXPIRY_MINUTES = 5;
+    private static final int RESET_TOKEN_EXPIRY_MINUTES = 5;
+    private static final int MAX_OTP_ATTEMPTS = 5;
+
+    private final SecureRandom secureRandom = new SecureRandom();
+
+    // =========================================================
+    // OTP Password Reset Flow
+    // =========================================================
+
+    /**
+     * Generate a cryptographically secure 6-digit OTP (100000–999999).
+     * Never uses Math.random() or java.util.Random.
+     */
+    private String generateOtp() {
+        int otp = OTP_MIN + secureRandom.nextInt(OTP_MAX - OTP_MIN + 1);
+        return String.valueOf(otp);
+    }
+
+    /**
+     * Mask a phone number for safe display: +91******1234
+     * Shows country code (first 3 chars) and last 4 digits.
+     */
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() < 7) {
+            return "******";
+        }
+        String clean = phone.startsWith("+") ? phone.substring(1) : phone;
+        String countryCode = clean.length() >= 12 ? clean.substring(0, 3) : "+91";
+        String lastFour = clean.substring(clean.length() - 4);
+        int starCount = clean.length() - 7;
+        return "+" + countryCode + "*".repeat(Math.max(starCount, 6)) + lastFour;
+    }
 
     @Override
     @Transactional
     public String forgotPassword(ForgotPasswordRequest request) {
 
-        log.info("[FORGOT-PASSWORD] Password reset requested for email={}", request.getEmail());
+        log.info("[OTP-RESET] Password reset requested for email={}", request.getEmail());
 
         // SECURITY: Always return the same generic message regardless of
         // whether the email exists — prevents user enumeration.
+        String genericMessage = "If an account exists, an OTP has been sent to the registered phone number.";
+
         var userOpt = userRepository.findByEmail(request.getEmail());
 
         if (userOpt.isEmpty()) {
-            log.info("[FORGOT-PASSWORD] No user found for email={} — returning generic response", request.getEmail());
-            return "If an account with that email exists, a reset link has been sent.";
+            log.info("[OTP-RESET] No user found for email={} — returning generic response", request.getEmail());
+            return genericMessage;
         }
 
         User user = userOpt.get();
-        log.info("[FORGOT-PASSWORD] User found: id={}, email={}", user.getId(), user.getEmail());
+        log.info("[OTP-RESET] User found: id={}, email={}", user.getId(), user.getEmail());
+
+        // Validate user has a registered phone number
+        if (user.getPhone() == null || user.getPhone().isBlank()) {
+            log.warn("[OTP-RESET] User has no registered phone number (user={})", user.getId());
+            // Return same generic message — never reveal internal state
+            return genericMessage;
+        }
 
         // Delete ALL old reset tokens for this user.
         // The @OneToOne on user_id creates a UNIQUE constraint in MySQL,
         // so we MUST remove the old row before inserting a new one.
-        // Wrapped in @Transactional to ensure atomicity.
-        int deleted = passwordResetTokenRepository
-                .deleteByUserId(user.getId());
+        int deleted = passwordResetTokenRepository.deleteByUserId(user.getId());
         if (deleted > 0) {
-            log.info("[FORGOT-PASSWORD] Deleted {} old token(s) for user={}", deleted, user.getId());
+            log.info("[OTP-RESET] Deleted {} old token(s) for user={}", deleted, user.getId());
         }
 
-        String token = UUID.randomUUID().toString();
+        // Generate and hash the OTP
+        String otp = generateOtp();
+        String otpHash = passwordEncoder.encode(otp);
 
-        PasswordResetToken passwordResetToken = PasswordResetToken.builder()
-                .token(token)
+        // Create the reset record with OTP
+        PasswordResetToken resetRecord = PasswordResetToken.builder()
                 .user(user)
-                .expiryDate(LocalDateTime.now().plusMinutes(15))
+                .otpHash(otpHash)
+                .expiryDate(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
+                .attempts(0)
+                .verified(false)
+                .maskedPhone(maskPhone(user.getPhone()))
                 .build();
 
-        passwordResetTokenRepository.save(passwordResetToken);
-        log.info("[FORGOT-PASSWORD] Reset token generated for user={}", user.getId());
+        passwordResetTokenRepository.save(resetRecord);
+        log.info("[OTP-RESET] OTP record created for user={}", user.getId());
 
-        // Build the reset link and send via email
-        String resetLink = frontendUrl + "/reset-password?token=" + token;
-        String subject = "DistribuTrack – Password Reset";
-        String htmlBody = "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;'>"
-                + "<h2 style='color:#333;'>Password Reset Request</h2>"
-                + "<p>Hello <strong>" + user.getFullName() + "</strong>,</p>"
-                + "<p>You requested a password reset for your DistribuTrack account.</p>"
-                + "<p>Click the button below to set a new password. This link expires in 15 minutes.</p>"
-                + "<p style='text-align:center;margin:30px 0;'>"
-                + "<a href='" + resetLink + "' "
-                + "style='background-color:#4F46E5;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:bold;'>"
-                + "Reset Password</a></p>"
-                + "<p style='color:#666;font-size:13px;'>If you did not request this, you can safely ignore this email. "
-                + "Your password will not change unless you click the link above.</p>"
-                + "<hr style='border:none;border-top:1px solid #eee;margin:20px 0;' />"
-                + "<p style='color:#999;font-size:12px;'>DistribuTrack — Distribution Management System</p>"
-                + "</div>";
+        // Send OTP via SMS using the user's registered phone number
+        String smsMessage = "Your DistribuTrack password reset OTP is: " + otp + ". It expires in 5 minutes. Do not share this code.";
+        smsService.send(user.getPhone(), smsMessage);
+        log.info("[OTP-RESET] SMS send initiated for user={}", user.getId());
 
-        log.info("[FORGOT-PASSWORD] Sending email to={}, frontendUrl={}", user.getEmail(), frontendUrl);
-        emailService.send(user.getEmail(), subject, htmlBody);
-        log.info("[FORGOT-PASSWORD] Email send initiated for user={}", user.getId());
-
-        // Always return the same message regardless of whether the email
-        // was actually sent — never reveal whether the address exists.
-        return "If an account with that email exists, a reset link has been sent.";
+        // Always return the same message — never reveal whether the email exists
+        return genericMessage;
     }
+
     @Override
+    @Transactional
+    public VerifyResetOtpResponse verifyResetOtp(VerifyResetOtpRequest request) {
+
+        log.info("[OTP-RESET] OTP verification requested for email={}", request.getEmail());
+
+        var userOpt = userRepository.findByEmail(request.getEmail());
+        if (userOpt.isEmpty()) {
+            // SECURITY: Same error for non-existent email — prevents enumeration
+            throw new RuntimeException("Invalid or expired OTP");
+        }
+
+        User user = userOpt.get();
+
+        // Find the active OTP record for this user
+        PasswordResetToken resetRecord = passwordResetTokenRepository
+                .findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("No active OTP. Please request a new one."));
+
+        // Check if OTP is already verified (cannot reuse)
+        if (Boolean.TRUE.equals(resetRecord.getVerified())) {
+            log.warn("[OTP-RESET] OTP already verified for user={}", user.getId());
+            throw new RuntimeException("OTP already verified. Please request a new one.");
+        }
+
+        // Check if OTP has expired
+        if (resetRecord.getExpiryDate().isBefore(LocalDateTime.now())) {
+            log.warn("[OTP-RESET] OTP expired for user={}", user.getId());
+            passwordResetTokenRepository.delete(resetRecord);
+            throw new RuntimeException("OTP has expired. Please request a new OTP.");
+        }
+
+        // Check attempt limit
+        if (resetRecord.getAttempts() >= MAX_OTP_ATTEMPTS) {
+            log.warn("[OTP-RESET] Max attempts exceeded for user={}", user.getId());
+            passwordResetTokenRepository.delete(resetRecord);
+            throw new RuntimeException("Too many incorrect attempts. Please request a new OTP.");
+        }
+
+        // Verify the OTP
+        boolean otpValid = passwordEncoder.matches(request.getOtp(), resetRecord.getOtpHash());
+
+        if (!otpValid) {
+            resetRecord.setAttempts(resetRecord.getAttempts() + 1);
+            int remainingAttempts = MAX_OTP_ATTEMPTS - resetRecord.getAttempts();
+            passwordResetTokenRepository.save(resetRecord);
+
+            if (remainingAttempts <= 0) {
+                log.warn("[OTP-RESET] OTP invalidated after max attempts for user={}", user.getId());
+                passwordResetTokenRepository.delete(resetRecord);
+                throw new RuntimeException("Too many incorrect attempts. Please request a new OTP.");
+            }
+
+            log.warn("[OTP-RESET] Invalid OTP for user={}, attempts={}", user.getId(), resetRecord.getAttempts());
+            throw new RuntimeException("Invalid OTP. " + remainingAttempts + " attempt(s) remaining.");
+        }
+
+        // OTP is valid — issue a short-lived reset token
+        String resetToken = UUID.randomUUID().toString();
+        resetRecord.setToken(resetToken);
+        resetRecord.setVerified(true);
+        resetRecord.setOtpHash(null); // Clear OTP hash — no longer needed
+        resetRecord.setExpiryDate(LocalDateTime.now().plusMinutes(RESET_TOKEN_EXPIRY_MINUTES));
+        resetRecord.setAttempts(0);
+        passwordResetTokenRepository.save(resetRecord);
+
+        log.info("[OTP-RESET] OTP verified and reset token issued for user={}", user.getId());
+
+        return VerifyResetOtpResponse.builder()
+                .message("OTP verified successfully.")
+                .resetToken(resetToken)
+                .build();
+    }
+
+    @Override
+    @Transactional
     public void resetPassword(ResetPasswordRequest request) {
 
         log.info("[RESET-PASSWORD] Password reset requested");
 
         PasswordResetToken passwordResetToken = passwordResetTokenRepository
-                .findByToken(request.getToken())
+                .findByToken(request.getResetToken())
                 .orElseThrow(() -> {
                     log.warn("[RESET-PASSWORD] Invalid or non-existent token");
                     return new RuntimeException("Invalid reset token");
                 });
 
+        // Validate the reset token was verified via OTP (not a stale/old-style token)
+        if (!Boolean.TRUE.equals(passwordResetToken.getVerified())) {
+            log.warn("[RESET-PASSWORD] Token not verified via OTP for user={}", passwordResetToken.getUser().getId());
+            throw new RuntimeException("Invalid reset token");
+        }
+
+        // Validate expiry
         if (passwordResetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
             log.warn("[RESET-PASSWORD] Token expired for user={}", passwordResetToken.getUser().getId());
             passwordResetTokenRepository.delete(passwordResetToken);
@@ -266,14 +381,14 @@ public class AuthServiceImpl implements AuthService {
         }
 
         User user = passwordResetToken.getUser();
-        log.info("[RESET-PASSWORD] Valid token for user={}; resetting password", user.getId());
+        log.info("[RESET-PASSWORD] Valid verified token for user={}; resetting password", user.getId());
 
-        user.setPassword(
-                passwordEncoder.encode(request.getNewPassword())
-        );
+        // Hash and set the new password
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         user.setEnabled(true);
-
         userRepository.save(user);
+
+        // Invalidate the reset token — prevent reuse
         passwordResetTokenRepository.delete(passwordResetToken);
 
         log.info("[RESET-PASSWORD] Password reset completed for user={}", user.getId());

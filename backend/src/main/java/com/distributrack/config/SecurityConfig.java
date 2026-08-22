@@ -39,6 +39,7 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/forgot-password",
+                                "/api/auth/verify-reset-otp",
                                 "/api/auth/reset-password",
                                 // Gateway webhook — public because the
                                 // gateway cannot authenticate; the payload

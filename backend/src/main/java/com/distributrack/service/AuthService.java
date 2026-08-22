@@ -4,6 +4,7 @@ import com.distributrack.dto.request.*;
 import com.distributrack.dto.response.AuthResponse;
 import com.distributrack.dto.response.RefreshTokenResponse;
 import com.distributrack.dto.response.UserResponse;
+import com.distributrack.dto.response.VerifyResetOtpResponse;
 
 public interface AuthService {
 
@@ -19,6 +20,8 @@ public interface AuthService {
                         ChangePasswordRequest request);
 
     String forgotPassword(ForgotPasswordRequest request);
+
+    VerifyResetOtpResponse verifyResetOtp(VerifyResetOtpRequest request);
 
     void resetPassword(ResetPasswordRequest request);
 

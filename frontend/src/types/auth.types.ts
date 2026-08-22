@@ -130,3 +130,25 @@ export interface ChangePasswordPayload {
   oldPassword: string;
   newPassword: string;
 }
+
+// ---------------------------------------------------------------------------
+// OTP Password Reset
+// ---------------------------------------------------------------------------
+
+/** Matches VerifyResetOtpRequest.java. */
+export interface VerifyResetOtpPayload {
+  email: string;
+  otp: string;
+}
+
+/** Matches VerifyResetOtpResponse.java. */
+export interface VerifyResetOtpResponse {
+  message: string;
+  resetToken: string;
+}
+
+/** Matches ResetPasswordRequest.java — uses resetToken instead of token. */
+export interface ResetPasswordPayload {
+  resetToken: string;
+  newPassword: string;
+}

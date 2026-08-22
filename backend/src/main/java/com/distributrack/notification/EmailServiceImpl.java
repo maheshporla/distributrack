@@ -56,8 +56,12 @@ public class EmailServiceImpl implements EmailService {
             return;
         }
 
+        // Trim to remove accidental newlines/whitespace that break the
+        // HTTP Authorization header (OkHttp rejects 0x0a characters).
+        String apiKey = resendApiKey.trim();
+
         try {
-            Resend resend = new Resend(resendApiKey);
+            Resend resend = new Resend(apiKey);
             CreateEmailOptions params = CreateEmailOptions.builder()
                     .from(from)
                     .to(to)
