@@ -28,7 +28,7 @@ import com.distributrack.dto.request.VerifyResetOtpRequest;
 import com.distributrack.entity.PasswordResetToken;
 import com.distributrack.repository.PasswordResetTokenRepository;
 
-import com.distributrack.notification.SmsService;
+import com.distributrack.notification.EmailService;
 import com.distributrack.dto.response.VerifyResetOtpResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,7 +42,7 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
-    private final SmsService smsService;
+    private final EmailService emailService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -205,53 +205,72 @@ public class AuthServiceImpl implements AuthService {
     }
 
     /**
-     * Mask a phone number for safe display: +91******1234
-     * Shows country code (first 3 chars) and last 4 digits.
+     * Mask an email for safe display: m****93@gmail.com
+     * Shows first char, stars, last 4 chars before @.
      */
-    private String maskPhone(String phone) {
-        if (phone == null || phone.length() < 7) {
-            return "******";
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return "***@***";
         }
-        String clean = phone.startsWith("+") ? phone.substring(1) : phone;
-        String countryCode = clean.length() >= 12 ? clean.substring(0, 3) : "+91";
-        String lastFour = clean.substring(clean.length() - 4);
-        int starCount = clean.length() - 7;
-        return "+" + countryCode + "*".repeat(Math.max(starCount, 6)) + lastFour;
+        int atIndex = email.indexOf('@');
+        String localPart = email.substring(0, atIndex);
+        String domain = email.substring(atIndex);
+
+        if (localPart.length() <= 2) {
+            return localPart.charAt(0) + "*".repeat(Math.max(localPart.length(), 3)) + domain;
+        }
+
+        String firstChar = localPart.substring(0, 1);
+        String lastChars = localPart.substring(localPart.length() - 2);
+        return firstChar + "*".repeat(Math.max(localPart.length() - 2, 3)) + lastChars + domain;
+    }
+
+    /**
+     * Build an HTML email body for the password-reset OTP.
+     */
+    private String buildOtpEmailHtml(String otp) {
+        return "<!DOCTYPE html>" +
+                "<html><head><meta charset='UTF-8'></head><body>" +
+                "<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;'>" +
+                "<h2 style='color:#333;'>DistribuTrack - Password Reset</h2>" +
+                "<p>Hello,</p>" +
+                "<p>We received a request to reset your DistribuTrack password.</p>" +
+                "<p>Your verification code is:</p>" +
+                "<div style='background:#f4f4f4;border-radius:8px;padding:20px;text-align:center;margin:20px 0;'>" +
+                "<span style='font-size:32px;font-weight:bold;letter-spacing:8px;color:#333;'>" + otp + "</span>" +
+                "</div>" +
+                "<p>This code expires in <strong>5 minutes</strong>.</p>" +
+                "<p>If you did not request a password reset, you can safely ignore this email.</p>" +
+                "<p style='color:#666;margin-top:30px;'>Regards,<br>DistribuTrack</p>" +
+                "</div></body></html>";
     }
 
     @Override
     @Transactional
     public String forgotPassword(ForgotPasswordRequest request) {
 
-        log.info("[OTP-RESET] Password reset requested for email={}", request.getEmail());
+        log.info("[FORGOT-PASSWORD] Password reset requested for email={}", request.getEmail());
 
         // SECURITY: Always return the same generic message regardless of
         // whether the email exists — prevents user enumeration.
-        String genericMessage = "If an account exists, an OTP has been sent to the registered phone number.";
+        String genericMessage = "If an account exists, a verification code has been sent to the registered email address.";
 
         var userOpt = userRepository.findByEmail(request.getEmail());
 
         if (userOpt.isEmpty()) {
-            log.info("[OTP-RESET] No user found for email={} — returning generic response", request.getEmail());
+            log.info("[FORGOT-PASSWORD] No user found for email={} — returning generic response", request.getEmail());
             return genericMessage;
         }
 
         User user = userOpt.get();
-        log.info("[OTP-RESET] User found: id={}, email={}", user.getId(), user.getEmail());
-
-        // Validate user has a registered phone number
-        if (user.getPhone() == null || user.getPhone().isBlank()) {
-            log.warn("[OTP-RESET] User has no registered phone number (user={})", user.getId());
-            // Return same generic message — never reveal internal state
-            return genericMessage;
-        }
+        log.info("[FORGOT-PASSWORD] User found: id={}, email={}", user.getId(), user.getEmail());
 
         // Delete ALL old reset tokens for this user.
         // The @OneToOne on user_id creates a UNIQUE constraint in MySQL,
         // so we MUST remove the old row before inserting a new one.
         int deleted = passwordResetTokenRepository.deleteByUserId(user.getId());
         if (deleted > 0) {
-            log.info("[OTP-RESET] Deleted {} old token(s) for user={}", deleted, user.getId());
+            log.info("[FORGOT-PASSWORD] Deleted {} old token(s) for user={}", deleted, user.getId());
         }
 
         // Generate and hash the OTP
@@ -265,16 +284,17 @@ public class AuthServiceImpl implements AuthService {
                 .expiryDate(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES))
                 .attempts(0)
                 .verified(false)
-                .maskedPhone(maskPhone(user.getPhone()))
+                .maskedEmail(maskEmail(user.getEmail()))
                 .build();
 
         passwordResetTokenRepository.save(resetRecord);
-        log.info("[OTP-RESET] OTP record created for user={}", user.getId());
+        log.info("[FORGOT-PASSWORD] OTP record created for user={}", user.getId());
 
-        // Send OTP via SMS using the user's registered phone number
-        String smsMessage = "Your DistribuTrack password reset OTP is: " + otp + ". It expires in 5 minutes. Do not share this code.";
-        smsService.send(user.getPhone(), smsMessage);
-        log.info("[OTP-RESET] SMS send initiated for user={}", user.getId());
+        // Send OTP via EMAIL using the user's registered email address
+        String subject = "DistribuTrack - Password Reset OTP";
+        String htmlBody = buildOtpEmailHtml(otp);
+        emailService.send(user.getEmail(), subject, htmlBody);
+        log.info("[EMAIL] Password reset OTP send initiated for user={}", user.getId());
 
         // Always return the same message — never reveal whether the email exists
         return genericMessage;

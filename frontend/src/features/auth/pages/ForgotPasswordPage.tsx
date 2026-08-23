@@ -19,7 +19,7 @@ import {
   resetPasswordSchema,
   type ResetPasswordFormValues,
 } from "@/schemas/auth.schemas";
-import { Mail, CheckCircle, AlertTriangle, Shield } from "lucide-react";
+import { Mail, CheckCircle, AlertTriangle, MailCheck } from "lucide-react";
 
 type Step = "email" | "otp" | "password" | "success";
 
@@ -277,7 +277,7 @@ export function ForgotPasswordPage() {
     return (
       <AuthCard
         title="Verify OTP"
-        description="Enter the 6-digit OTP sent to your registered phone number."
+        description="Enter the 6-digit OTP sent to your registered email address."
         footer={
           <p className="text-sm text-muted-foreground">
             <button
@@ -298,10 +298,10 @@ export function ForgotPasswordPage() {
         }
       >
         <div className="space-y-4">
-          {/* Masked phone info */}
+          {/* Masked email info */}
           <div className="flex items-center gap-2 rounded-md bg-muted p-3 text-sm text-muted-foreground">
-            <Shield className="h-4 w-4 shrink-0" />
-            <span>OTP sent to your registered phone number</span>
+            <MailCheck className="h-4 w-4 shrink-0" />
+            <span>OTP sent to <strong className="text-foreground">{email}</strong></span>
           </div>
 
           {/* OTP Error */}
@@ -373,7 +373,7 @@ export function ForgotPasswordPage() {
   return (
     <AuthCard
       title="Forgot your password?"
-      description="Enter your email address and we'll send an OTP to your registered phone number."
+      description="Enter your registered email address and we'll send you a verification code."
       footer={
         <p className="text-sm text-muted-foreground">
           Remember your password?{" "}

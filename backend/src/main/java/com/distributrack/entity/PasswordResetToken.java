@@ -70,4 +70,12 @@ public class PasswordResetToken {
      */
     @Column(name = "masked_phone", length = 20)
     private String maskedPhone;
+
+    /**
+     * Masked email shown to the user (e.g. m****93@gmail.com).
+     * Returned in the forgot-password response for UX when
+     * the OTP is sent via email.
+     */
+    @Column(name = "masked_email", length = 50)
+    private String maskedEmail;
 }

@@ -79,8 +79,8 @@ export const authService = {
   },
 
   /**
-   * Request a password reset OTP. The backend sends an SMS OTP to the
-   * registered phone number. Returns a generic success message regardless
+   * Request a password reset OTP. The backend sends an email OTP to the
+   * registered email address. Returns a generic success message regardless
    * of whether the email exists — prevents user enumeration.
    */
   async forgotPassword(email: string): Promise<string> {
@@ -92,7 +92,7 @@ export const authService = {
   },
 
   /**
-   * Verify the OTP received via SMS. Returns a resetToken on success
+   * Verify the OTP received via email. Returns a resetToken on success
    * that must be used with resetPassword.
    */
   async verifyResetOtp(

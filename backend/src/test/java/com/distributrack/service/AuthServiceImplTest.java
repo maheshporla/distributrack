@@ -11,7 +11,7 @@ import com.distributrack.entity.PasswordResetToken;
 import com.distributrack.entity.Role;
 import com.distributrack.entity.User;
 import com.distributrack.enums.RoleName;
-import com.distributrack.notification.SmsService;
+import com.distributrack.notification.EmailService;
 import com.distributrack.repository.PasswordResetTokenRepository;
 import com.distributrack.repository.RoleRepository;
 import com.distributrack.repository.UserRepository;
@@ -38,10 +38,10 @@ class AuthServiceImplTest {
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
     private final PasswordResetTokenRepository passwordResetTokenRepository = mock(PasswordResetTokenRepository.class);
     private final CurrentUserService currentUserService = mock(CurrentUserService.class);
-    private final SmsService smsService = mock(SmsService.class);
+    private final EmailService emailService = mock(EmailService.class);
 
     private final AuthServiceImpl authService = new AuthServiceImpl(
-            smsService,
+            emailService,
             passwordResetTokenRepository,
             userRepository,
             roleRepository,
@@ -180,11 +180,11 @@ class AuthServiceImplTest {
 
         String response = authService.forgotPassword(request);
 
-        assertTrue(response.contains("OTP has been sent"));
+        assertTrue(response.contains("a verification code has been sent"));
         // Verify OTP record was saved
         verify(passwordResetTokenRepository).save(any(PasswordResetToken.class));
-        // Verify SMS was sent
-        verify(smsService).send(eq("+919876543210"), anyString());
+        // Verify email was sent
+        verify(emailService).send(eq("test@test.com"), eq("DistribuTrack - Password Reset OTP"), anyString());
     }
 
     @Test
@@ -231,14 +231,16 @@ class AuthServiceImplTest {
         String response = authService.forgotPassword(request);
 
         // Same message — no user enumeration
-        assertTrue(response.contains("OTP has been sent"));
-        verify(smsService, never()).send(anyString(), anyString());
+        assertTrue(response.contains("a verification code has been sent"));
+        verify(emailService, never()).send(anyString(), anyString(), anyString());
         verify(passwordResetTokenRepository, never()).save(any());
     }
 
     @Test
-    void forgotPasswordHandlesUserWithoutPhone() {
+    void forgotPasswordWorksWithEmailOnlyRegardlessOfPhone() {
 
+        // In the email OTP flow, the phone number is irrelevant.
+        // The OTP is sent to the user's registered email address.
         User user = User.builder()
                 .id(20L)
                 .fullName("No Phone User")
@@ -250,6 +252,10 @@ class AuthServiceImplTest {
 
         when(userRepository.findByEmail("nophone@test.com"))
                 .thenReturn(Optional.of(user));
+        when(passwordResetTokenRepository.deleteByUserId(20L)).thenReturn(0);
+        when(passwordResetTokenRepository.save(any(PasswordResetToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed-otp");
 
         ForgotPasswordRequest request = new ForgotPasswordRequest();
         request.setEmail("nophone@test.com");
@@ -257,8 +263,10 @@ class AuthServiceImplTest {
         String response = authService.forgotPassword(request);
 
         // Same generic message — never reveals internal state
-        assertTrue(response.contains("OTP has been sent"));
-        verify(smsService, never()).send(anyString(), anyString());
+        assertTrue(response.contains("a verification code has been sent"));
+        // Email IS sent — phone is irrelevant
+        verify(emailService).send(eq("nophone@test.com"), eq("DistribuTrack - Password Reset OTP"), anyString());
+        verify(passwordResetTokenRepository).save(any(PasswordResetToken.class));
     }
 
     @Test
@@ -311,12 +319,12 @@ class AuthServiceImplTest {
 
             String response = authService.forgotPassword(request);
 
-            assertTrue(response.contains("OTP has been sent"),
+            assertTrue(response.contains("a verification code has been sent"),
                     role + " should receive OTP");
-            verify(smsService).send(eq(user.getPhone()), anyString());
+            verify(emailService).send(eq(user.getEmail()), eq("DistribuTrack - Password Reset OTP"), anyString());
 
             // Reset mocks for next iteration
-            reset(userRepository, passwordResetTokenRepository, smsService, passwordEncoder);
+            reset(userRepository, passwordResetTokenRepository, emailService, passwordEncoder);
         }
     }
 
