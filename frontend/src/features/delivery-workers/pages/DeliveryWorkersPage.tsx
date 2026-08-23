@@ -89,6 +89,7 @@ export function DeliveryWorkersPage() {
 
       await userService.updateUser(worker.id, {
         fullName: worker.fullName,
+        email: worker.email,
         phone: worker.phone,
         role: "DELIVERY_BOY",
         enabled: !worker.enabled,

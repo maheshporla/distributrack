@@ -77,6 +77,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
     resolver: zodResolver(updateUserSchema),
     defaultValues: {
       fullName: user?.fullName ?? "",
+      email: user?.email ?? "",
       phone: user?.phone ?? "",
       role: user?.role ?? "SHOPKEEPER",
       enabled: user?.enabled ?? true,
@@ -89,6 +90,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
     if (user) {
       updateForm.reset({
         fullName: user.fullName,
+        email: user.email,
         phone: user.phone,
         role: user.role,
         enabled: user.enabled,
@@ -128,6 +130,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
       // Empty password means "keep current" — only send it when provided.
       const payload = {
         fullName: values.fullName,
+        email: values.email,
         phone: values.phone,
         role: values.role,
         enabled: values.enabled,
@@ -226,23 +229,27 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
           )}
         </div>
 
-        {/* Email (create only) */}
-        {!isEdit && (
-          <div className="space-y-2">
-            <Label htmlFor="email">Email *</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="user@example.com"
-              {...createForm.register("email")}
-            />
-            {createForm.formState.errors.email && (
-              <p className="text-sm text-destructive">
-                {createForm.formState.errors.email.message}
-              </p>
-            )}
-          </div>
-        )}
+        {/* Email */}
+        <div className="space-y-2">
+          <Label htmlFor="email">Email Address *</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="user@example.com"
+            {...(isEdit
+              ? updateForm.register("email")
+              : createForm.register("email"))}
+          />
+          {(isEdit
+            ? updateForm.formState.errors.email
+            : createForm.formState.errors.email) && (
+            <p className="text-sm text-destructive">
+              {(isEdit
+                ? updateForm.formState.errors.email
+                : createForm.formState.errors.email)?.message}
+            </p>
+          )}
+        </div>
 
         {/* Password (create only) */}
         {!isEdit && (

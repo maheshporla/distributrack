@@ -116,6 +116,7 @@ export function UsersManagementPage() {
 
       await userService.updateUser(target.id, {
         fullName: target.fullName,
+        email: target.email,
         phone: target.phone,
         role: target.role,
         enabled: !target.enabled,

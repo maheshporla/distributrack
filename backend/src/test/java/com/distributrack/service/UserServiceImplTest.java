@@ -124,6 +124,7 @@ class UserServiceImplTest {
 
         UpdateUserRequest request = UpdateUserRequest.builder()
                 .fullName("System Administrator")
+                .email("admin@test.com")
                 .phone("9000000000")
                 .role(RoleName.SUPER_ADMIN)
                 .enabled(true)
@@ -152,6 +153,7 @@ class UserServiceImplTest {
 
         UpdateUserRequest request = UpdateUserRequest.builder()
                 .fullName("Shop")
+                .email("shop@test.com")
                 .phone("9222222222")
                 .role(RoleName.SUPER_ADMIN)
                 .enabled(true)
@@ -162,6 +164,101 @@ class UserServiceImplTest {
 
         assertTrue(ex.getMessage().contains("SUPER_ADMIN"));
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    // --- Email Update Tests ---
+
+    @Test
+    void adminCanUpdateUserEmail() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(shopkeeper));
+        when(userRepository.findByEmail("newshop@test.com")).thenReturn(Optional.empty());
+
+        UpdateUserRequest request = UpdateUserRequest.builder()
+                .fullName("Shop One")
+                .email("newshop@test.com")
+                .phone("9000000001")
+                .role(RoleName.SHOPKEEPER)
+                .enabled(true)
+                .build();
+
+        UserResponse response = userService.updateUser(3L, request);
+
+        assertEquals("newshop@test.com", response.getEmail());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void adminCannotUpdateToDuplicateEmail() {
+
+        User otherUser = User.builder()
+                .id(4L)
+                .fullName("Other")
+                .email("taken@test.com")
+                .phone("9333333333")
+                .enabled(true)
+                .role(new Role(6L, RoleName.SHOPKEEPER))
+                .build();
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(shopkeeper));
+        when(userRepository.findByEmail("taken@test.com")).thenReturn(Optional.of(otherUser));
+
+        UpdateUserRequest request = UpdateUserRequest.builder()
+                .fullName("Shop One")
+                .email("taken@test.com")
+                .phone("9000000001")
+                .role(RoleName.SHOPKEEPER)
+                .enabled(true)
+                .build();
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.updateUser(3L, request));
+
+        assertTrue(ex.getMessage().contains("already registered"));
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void sameEmailDoesNotTriggerUniquenessCheck() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(shopkeeper));
+
+        UpdateUserRequest request = UpdateUserRequest.builder()
+                .fullName("Shop One Updated")
+                .email("shop1@test.com")
+                .phone("9000000001")
+                .role(RoleName.SHOPKEEPER)
+                .enabled(true)
+                .build();
+
+        UserResponse response = userService.updateUser(3L, request);
+
+        assertEquals("Shop One Updated", response.getFullName());
+        verify(userRepository, never()).findByEmail(anyString());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void emailIsNormalizedToLowerCase() {
+
+        when(currentUserService.getCurrentUser()).thenReturn(admin);
+        when(userRepository.findById(3L)).thenReturn(Optional.of(shopkeeper));
+        when(userRepository.findByEmail("newshop@test.com")).thenReturn(Optional.empty());
+
+        UpdateUserRequest request = UpdateUserRequest.builder()
+                .fullName("Shop One")
+                .email("NewShop@Test.Com")
+                .phone("9000000001")
+                .role(RoleName.SHOPKEEPER)
+                .enabled(true)
+                .build();
+
+        UserResponse response = userService.updateUser(3L, request);
+
+        assertEquals("newshop@test.com", response.getEmail());
     }
 
     // --- Delivery Partner Application Tests ---

@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.List;
 import java.util.Map;
@@ -225,6 +226,16 @@ public class UserServiceImpl implements UserService {
 
         Role role = roleRepository.findByName(request.getRole())
                 .orElseThrow(() -> new RuntimeException("Role not found: " + request.getRole()));
+
+        // Email update — normalize and enforce uniqueness
+        String newEmail = request.getEmail().trim().toLowerCase();
+        if (!newEmail.equals(user.getEmail())) {
+            Optional<User> existingByEmail = userRepository.findByEmail(newEmail);
+            if (existingByEmail.isPresent()) {
+                throw new RuntimeException("This email address is already registered");
+            }
+            user.setEmail(newEmail);
+        }
 
         user.setFullName(request.getFullName().trim());
         user.setPhone(request.getPhone().trim());

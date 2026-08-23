@@ -5,7 +5,7 @@
  *   - UserController: /api/users (GET list w/ role+search, GET /{id},
  *     POST create, PUT /{id}, DELETE /{id} soft-disable)
  *   - CreateUserRequest: { fullName, email, password, phone, role }
- *   - UpdateUserRequest: { fullName, phone, role, enabled }
+ *   - UpdateUserRequest: { fullName, email, phone, role, enabled }
  *   - UserResponse:      { id, fullName, email, phone, role, enabled,
  *                          createdAt }  (see UserProfile in auth.types.ts)
  *
@@ -32,6 +32,7 @@ export interface CreateUserPayload {
 /** Matches UpdateUserRequest.java (password is optional — omit to keep current). */
 export interface UpdateUserPayload {
   fullName: string;
+  email: string;
   phone: string;
   role: RoleName;
   enabled: boolean;
