@@ -35,6 +35,10 @@ public class NotificationDeliveryListener {
                     event.getTitle(),
                     htmlBody
             );
+        } else {
+            log.info("[EMAIL] Skipping email for event type={}: no recipient email configured " +
+                    "(recipient={}, emailNotificationsEnabled=false or email is null)",
+                    event.getType(), event.getRecipientName());
         }
 
         if (event.getRecipientPhone() != null && !event.getRecipientPhone().isBlank()) {

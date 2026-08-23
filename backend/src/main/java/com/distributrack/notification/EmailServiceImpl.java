@@ -75,10 +75,19 @@ public class EmailServiceImpl implements EmailService {
             if (response != null && response.getId() != null) {
                 log.info("[EMAIL] Resend delivery accepted: messageId={}, to={}", response.getId(), to);
             } else {
-                log.warn("[EMAIL] Resend returned null response for to={}", to);
+                log.warn("[EMAIL] Resend returned null/empty response for to={}. " +
+                        "This may indicate a sandbox/testing restriction.", to);
             }
         } catch (Exception ex) {
-            log.error("[EMAIL] Resend FAILED for to={}: {}", to, ex.getMessage(), ex);
+            String msg = ex.getMessage();
+            if (msg != null && (msg.contains("403") || msg.contains("Forbidden")
+                    || msg.contains("testing") || msg.contains("sandbox"))) {
+                log.error("[EMAIL] Resend REJECTED for to={}: {} " +
+                        "[LIKELY RESEND SANDBOX/DOMAIN RESTRICTION — " +
+                        "verify a custom domain or add recipient to Resend allow-list]", to, msg);
+            } else {
+                log.error("[EMAIL] Resend FAILED for to={}: {}", to, msg, ex);
+            }
         }
     }
 
