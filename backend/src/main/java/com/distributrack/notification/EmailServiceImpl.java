@@ -1,7 +1,5 @@
 package com.distributrack.notification;
 
-import com.resend.Resend;
-import com.resend.services.emails.model.CreateEmailOptions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -26,12 +24,6 @@ public class EmailServiceImpl implements EmailService {
     @Value("${app.notifications.email.from:DistribuTrack <no-reply@distributrack.local>}")
     private String from;
 
-    @Value("${app.notifications.email.provider:smtp}")
-    private String provider;
-
-    @Value("${app.notifications.email.resend-api-key:}")
-    private String resendApiKey;
-
     @Override
     @Async("notificationExecutor")
     public void send(String to, String subject, String htmlBody) {
@@ -42,53 +34,7 @@ public class EmailServiceImpl implements EmailService {
             return;
         }
 
-        if ("resend".equalsIgnoreCase(provider)) {
-            sendViaResend(to, subject, htmlBody);
-        } else {
-            sendViaSmtp(to, subject, htmlBody);
-        }
-    }
-
-    private void sendViaResend(String to, String subject, String htmlBody) {
-        if (resendApiKey == null || resendApiKey.isBlank()) {
-            log.error("[EMAIL] provider=resend but RESEND_API_KEY is not configured — " +
-                    "email to {} will NOT be delivered. Set the RESEND_API_KEY environment variable.", to);
-            return;
-        }
-
-        // Trim to remove accidental newlines/whitespace that break the
-        // HTTP Authorization header (OkHttp rejects 0x0a characters).
-        String apiKey = resendApiKey.trim();
-
-        try {
-            Resend resend = new Resend(apiKey);
-            CreateEmailOptions params = CreateEmailOptions.builder()
-                    .from(from)
-                    .to(to)
-                    .subject(subject)
-                    .html(htmlBody)
-                    .build();
-
-            log.info("[EMAIL] Sending via Resend: to={}, from={}, subject={}", to, from, subject);
-            var response = resend.emails().send(params);
-
-            if (response != null && response.getId() != null) {
-                log.info("[EMAIL] Resend delivery accepted: messageId={}, to={}", response.getId(), to);
-            } else {
-                log.warn("[EMAIL] Resend returned null/empty response for to={}. " +
-                        "This may indicate a sandbox/testing restriction.", to);
-            }
-        } catch (Exception ex) {
-            String msg = ex.getMessage();
-            if (msg != null && (msg.contains("403") || msg.contains("Forbidden")
-                    || msg.contains("testing") || msg.contains("sandbox"))) {
-                log.error("[EMAIL] Resend REJECTED for to={}: {} " +
-                        "[LIKELY RESEND SANDBOX/DOMAIN RESTRICTION — " +
-                        "verify a custom domain or add recipient to Resend allow-list]", to, msg);
-            } else {
-                log.error("[EMAIL] Resend FAILED for to={}: {}", to, msg, ex);
-            }
-        }
+        sendViaSmtp(to, subject, htmlBody);
     }
 
     private void sendViaSmtp(String to, String subject, String htmlBody) {
@@ -110,9 +56,9 @@ public class EmailServiceImpl implements EmailService {
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
             mailSender.send(message);
-            log.info("[EMAIL] sent to {}", to);
+            log.info("[EMAIL] SMTP sent to {}", to);
         } catch (Exception ex) {
-            log.warn("[EMAIL] failed to send to {}: {}", to, ex.getMessage());
+            log.error("[EMAIL] SMTP send failed to {}: {}", to, ex.getMessage());
         }
     }
 }
