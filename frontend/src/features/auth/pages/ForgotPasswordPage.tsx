@@ -23,13 +23,13 @@ import { Mail, CheckCircle, AlertTriangle, MailCheck } from "lucide-react";
 
 type Step = "email" | "otp" | "password" | "success";
 
-const RESEND_COOLDOWN_SECONDS = 60;
+const COOLDOWN_SECONDS = 60;
 
 /**
  * /forgot-password
  *
  * Three-step password reset flow:
- * 1. Enter email → OTP sent to registered phone via Twilio SMS
+ * 1. Enter email → OTP sent to registered email via Gmail SMTP
  * 2. Enter 6-digit OTP → verified server-side → reset token issued
  * 3. Set new password → password reset complete → redirect to login
  */
@@ -41,9 +41,9 @@ export function ForgotPasswordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
 
-  // Resend cooldown
-  const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
-  const [canResend, setCanResend] = useState(false);
+  // OTP cooldown
+  const [cooldown, setCooldown] = useState(COOLDOWN_SECONDS);
+  const [canRequestNewOtp, setCanRequestNewOtp] = useState(false);
   const cooldownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // OTP attempt feedback
@@ -75,14 +75,14 @@ export function ForgotPasswordPage() {
   }, []);
 
   const startCooldown = useCallback(() => {
-    setCooldown(RESEND_COOLDOWN_SECONDS);
-    setCanResend(false);
+    setCooldown(COOLDOWN_SECONDS);
+    setCanRequestNewOtp(false);
     if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
     cooldownTimerRef.current = setInterval(() => {
       setCooldown((prev) => {
         if (prev <= 1) {
           if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
-          setCanResend(true);
+          setCanRequestNewOtp(true);
           return 0;
         }
         return prev - 1;
@@ -134,8 +134,8 @@ export function ForgotPasswordPage() {
     }
   };
 
-  // ---- Resend OTP ----
-  const handleResendOtp = async () => {
+  // ---- Request new OTP ----
+  const handleRequestNewOtp = async () => {
     setIsSubmitting(true);
     setOtpError("");
     try {
@@ -146,7 +146,7 @@ export function ForgotPasswordPage() {
     } catch (error) {
       const apiError = error as ApiError;
       toast.error(
-        apiError.message || "Failed to resend OTP. Please try again.",
+        apiError.message || "Failed to send OTP. Please try again.",
       );
     } finally {
       setIsSubmitting(false);
@@ -285,7 +285,7 @@ export function ForgotPasswordPage() {
                 setStep("email");
                 setEmail("");
                 setCooldown(0);
-                setCanResend(true);
+                setCanRequestNewOtp(true);
                 if (cooldownTimerRef.current)
                   clearInterval(cooldownTimerRef.current);
                 otpForm.reset();
@@ -347,20 +347,20 @@ export function ForgotPasswordPage() {
             </Button>
           </form>
 
-          {/* Resend OTP */}
+          {/* Request new OTP */}
           <div className="text-center">
-            {canResend ? (
+            {canRequestNewOtp ? (
               <button
                 type="button"
-                onClick={handleResendOtp}
+                onClick={handleRequestNewOtp}
                 disabled={isSubmitting}
                 className="text-sm font-medium text-primary hover:underline disabled:opacity-50"
               >
-                Resend OTP
+                Request new OTP
               </button>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Resend OTP in {cooldown}s
+                Request new OTP in {cooldown}s
               </p>
             )}
           </div>
