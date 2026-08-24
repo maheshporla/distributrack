@@ -124,7 +124,7 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="fullName">Full Name</Label>
+          <Label htmlFor="fullName">Full Name <span className="text-destructive">*</span></Label>
           <Input
             id="fullName"
             type="text"
@@ -141,7 +141,7 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
           <Input
             id="email"
             type="email"
@@ -157,7 +157,7 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
+          <Label htmlFor="phone">Phone Number <span className="text-destructive">*</span></Label>
           <Input
             id="phone"
             type="tel"
@@ -176,7 +176,7 @@ export function RegisterPage() {
         {registrationType === "shopkeeper" && (
           <>
             <div className="space-y-2">
-              <Label htmlFor="shopName">Shop / Business Name</Label>
+              <Label htmlFor="shopName">Shop / Business Name <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
               <Input
                 id="shopName"
                 type="text"
@@ -193,7 +193,7 @@ export function RegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address">Shop Address</Label>
+              <Label htmlFor="address">Shop Address <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
               <Input
                 id="address"
                 type="text"
@@ -215,7 +215,7 @@ export function RegisterPage() {
         {registrationType === "delivery_partner" && (
           <>
             <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
+              <Label htmlFor="city">City <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
               <Input
                 id="city"
                 type="text"
@@ -232,7 +232,7 @@ export function RegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dp-address">Address</Label>
+              <Label htmlFor="dp-address">Address <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
               <Input
                 id="dp-address"
                 type="text"
@@ -250,7 +250,7 @@ export function RegisterPage() {
 
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-2">
-                <Label htmlFor="vehicleType">Vehicle Type (optional)</Label>
+                <Label htmlFor="vehicleType">Vehicle Type <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
                 <Input
                   id="vehicleType"
                   type="text"
@@ -266,7 +266,7 @@ export function RegisterPage() {
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="vehicleNumber">Vehicle Number (optional)</Label>
+                <Label htmlFor="vehicleNumber">Vehicle Number <span className="text-muted-foreground text-xs font-normal">(Optional)</span></Label>
                 <Input
                   id="vehicleNumber"
                   type="text"
@@ -291,7 +291,7 @@ export function RegisterPage() {
         )}
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
           <PasswordInput
             id="password"
             autoComplete="new-password"
@@ -307,7 +307,7 @@ export function RegisterPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password</Label>
+          <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
           <PasswordInput
             id="confirmPassword"
             autoComplete="new-password"

@@ -5,117 +5,116 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ---------------------------------------------------------------------------
- * DistribuTrack Color System
+ * DistribuTrack — Premium Logistics SaaS Design System
  * ---------------------------------------------------------------------------
- * Brand: deep teal ("in-transit" teal) — evokes tracking, movement, trust.
- * Ink:   near-navy dark, used for the sidebar and dark-mode surfaces.
- * All values are H S% L% triplets (no color function) so they can be
- * composed with opacity modifiers, e.g. bg-primary/10.
+ * Brand: Deep teal — evokes tracking, movement, trust.
+ * Surfaces: Slate-blue tinted darks for depth and sophistication.
+ * All values are H S% L% triplets for opacity-modifier composition.
  * ------------------------------------------------------------------------ */
 :root {
   --radius: 0.625rem;
 
   /* Surfaces */
-  --background: 210 33% 98%;
-  --foreground: 220 49% 8%;
+  --background: 220 20% 98%;
+  --foreground: 222 47% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 220 49% 8%;
+  --card-foreground: 222 47% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 220 49% 8%;
+  --popover-foreground: 222 47% 11%;
 
-  /* Brand */
-  --primary: 175 77% 26%;
+  /* Brand — deep teal */
+  --primary: 174 60% 30%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 210 20% 95%;
-  --secondary-foreground: 220 49% 8%;
+  --secondary: 214 20% 94%;
+  --secondary-foreground: 222 47% 11%;
 
-  --muted: 210 20% 95%;
+  --muted: 214 20% 95%;
   --muted-foreground: 215 16% 47%;
 
-  --accent: 173 45% 94%;
-  --accent-foreground: 175 77% 20%;
+  --accent: 174 30% 94%;
+  --accent-foreground: 174 60% 22%;
 
-  /* Semantic status colors */
-  --destructive: 0 72% 51%;
+  /* Semantic status */
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --success: 142 76% 36%;
+  --success: 152 60% 40%;
   --success-foreground: 0 0% 100%;
   --warning: 32 95% 44%;
   --warning-foreground: 0 0% 100%;
-  --info: 221 83% 53%;
+  --info: 217 91% 60%;
   --info-foreground: 0 0% 100%;
 
   /* Chrome */
-  --border: 214 20% 90%;
-  --input: 214 20% 90%;
-  --ring: 175 77% 26%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 174 60% 30%;
 
-  /* Charts (Recharts) */
-  --chart-1: 175 77% 26%;
-  --chart-2: 221 83% 53%;
+  /* Charts */
+  --chart-1: 174 60% 30%;
+  --chart-2: 217 91% 60%;
   --chart-3: 32 95% 44%;
-  --chart-4: 142 76% 36%;
+  --chart-4: 152 60% 40%;
   --chart-5: 262 83% 58%;
 
-  /* Sidebar — deep ink, the app's signature dark chrome */
-  --sidebar: 220 49% 8%;
-  --sidebar-foreground: 210 20% 88%;
-  --sidebar-primary: 173 80% 40%;
-  --sidebar-primary-foreground: 220 49% 8%;
-  --sidebar-accent: 220 35% 14%;
+  /* Sidebar */
+  --sidebar: 222 47% 7%;
+  --sidebar-foreground: 217 20% 85%;
+  --sidebar-primary: 174 60% 45%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 222 35% 13%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-border: 220 35% 16%;
-  --sidebar-ring: 173 80% 40%;
+  --sidebar-border: 222 25% 14%;
+  --sidebar-ring: 174 60% 45%;
 }
 
 .dark {
-  --background: 220 40% 7%;
-  --foreground: 210 20% 92%;
-  --card: 220 35% 10%;
-  --card-foreground: 210 20% 92%;
-  --popover: 220 35% 10%;
-  --popover-foreground: 210 20% 92%;
+  --background: 222 47% 6%;
+  --foreground: 217 20% 90%;
+  --card: 222 40% 9%;
+  --card-foreground: 217 20% 90%;
+  --popover: 222 40% 9%;
+  --popover-foreground: 217 20% 90%;
 
-  --primary: 173 70% 45%;
-  --primary-foreground: 220 49% 8%;
+  --primary: 174 60% 42%;
+  --primary-foreground: 222 47% 6%;
 
-  --secondary: 220 30% 16%;
-  --secondary-foreground: 210 20% 92%;
+  --secondary: 222 30% 14%;
+  --secondary-foreground: 217 20% 90%;
 
-  --muted: 220 30% 16%;
-  --muted-foreground: 215 15% 65%;
+  --muted: 222 25% 14%;
+  --muted-foreground: 215 15% 60%;
 
-  --accent: 220 30% 18%;
-  --accent-foreground: 173 70% 65%;
+  --accent: 222 30% 16%;
+  --accent-foreground: 174 60% 65%;
 
-  --destructive: 0 70% 55%;
+  --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --success: 142 65% 45%;
+  --success: 152 55% 42%;
   --success-foreground: 0 0% 100%;
   --warning: 32 90% 55%;
-  --warning-foreground: 220 49% 8%;
-  --info: 221 83% 63%;
+  --warning-foreground: 222 47% 6%;
+  --info: 217 91% 65%;
   --info-foreground: 0 0% 100%;
 
-  --border: 220 25% 18%;
-  --input: 220 25% 18%;
-  --ring: 173 70% 45%;
+  --border: 222 20% 16%;
+  --input: 222 20% 16%;
+  --ring: 174 60% 42%;
 
-  --chart-1: 173 70% 45%;
-  --chart-2: 221 83% 63%;
+  --chart-1: 174 60% 42%;
+  --chart-2: 217 91% 65%;
   --chart-3: 32 90% 55%;
-  --chart-4: 142 65% 45%;
+  --chart-4: 152 55% 42%;
   --chart-5: 262 75% 65%;
 
-  --sidebar: 220 45% 5%;
-  --sidebar-foreground: 210 20% 88%;
-  --sidebar-primary: 173 70% 45%;
-  --sidebar-primary-foreground: 220 49% 8%;
-  --sidebar-accent: 220 30% 12%;
+  --sidebar: 222 47% 5%;
+  --sidebar-foreground: 217 20% 85%;
+  --sidebar-primary: 174 60% 42%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 222 30% 11%;
   --sidebar-accent-foreground: 0 0% 100%;
-  --sidebar-border: 220 30% 14%;
-  --sidebar-ring: 173 70% 45%;
+  --sidebar-border: 222 25% 12%;
+  --sidebar-ring: 174 60% 42%;
 }
 
 /* ---------------------------------------------------------------------------
@@ -221,6 +220,70 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Premium SaaS Utilities
+ * ------------------------------------------------------------------------ */
+@layer utilities {
+  /* Subtle glass-morphism for cards/panels */
+  .glass {
+    backdrop-filter: blur(12px) saturate(150%);
+  }
+
+  /* Premium card hover effect */
+  .card-hover {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  }
+  .card-hover:hover {
+    box-shadow: 0 4px 24px -4px hsl(var(--primary) / 0.08), 0 2px 8px -2px hsl(var(--primary) / 0.04);
+    border-color: hsl(var(--primary) / 0.15);
+    transform: translateY(-1px);
+  }
+
+  /* Premium gradient text */
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.7));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Subtle glow for primary elements */
+  .glow-primary {
+    box-shadow: 0 0 20px -4px hsl(var(--primary) / 0.15);
+  }
+
+  /* Shimmer loading effect */
+  .shimmer {
+    background: linear-gradient(90deg, transparent 0%, hsl(var(--muted) / 0.5) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Premium border gradient */
+  .border-gradient {
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    position: relative;
+  }
+  .border-gradient::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.3), hsl(var(--primary) / 0.05));
+    z-index: -1;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    padding: 1px;
   }
 }
 

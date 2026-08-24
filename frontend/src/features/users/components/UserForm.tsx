@@ -268,7 +268,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
             <Input
               id="password"
               type="password"
-              placeholder="At least 6 characters"
+              placeholder="6+ chars, A-Z, a-z, 0-9, @#$%"
               {...createForm.register("password")}
             />
             {createForm.formState.errors.password && (

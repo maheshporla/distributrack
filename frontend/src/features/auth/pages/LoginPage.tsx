@@ -72,7 +72,7 @@ export function LoginPage() {
 
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
           <Input
             id="email"
             type="email"
@@ -90,7 +90,7 @@ export function LoginPage() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
             <Link
               to={ROUTES.FORGOT_PASSWORD}
               className="text-xs font-medium text-primary hover:underline"

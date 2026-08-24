@@ -58,7 +58,7 @@ export function FirstAdminSetupPage() {
 
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="fullName">Full Name</Label>
+          <Label htmlFor="fullName">Full Name <span className="text-destructive">*</span></Label>
           <Input
             id="fullName"
             type="text"
@@ -75,7 +75,7 @@ export function FirstAdminSetupPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
           <Input
             id="email"
             type="email"
@@ -91,7 +91,7 @@ export function FirstAdminSetupPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
+          <Label htmlFor="phone">Phone Number <span className="text-destructive">*</span></Label>
           <Input
             id="phone"
             type="tel"
@@ -107,7 +107,7 @@ export function FirstAdminSetupPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
           <PasswordInput
             id="password"
             autoComplete="new-password"
@@ -121,7 +121,7 @@ export function FirstAdminSetupPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password</Label>
+          <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
           <PasswordInput
             id="confirmPassword"
             autoComplete="new-password"

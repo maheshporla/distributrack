@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import { useAuthStore } from "@/store/authStore";
 import { orderService } from "@/services/api/orderService";
@@ -67,71 +66,33 @@ export function ShopkeeperDashboardPage() {
   const totalPaid = successfulPayments.reduce((sum, p) => sum + p.amount, 0);
   const outstandingAmount = totalSpent - totalPaid;
 
+  const userName = user?.fullName?.split(" ")[0] ?? "there";
+
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title={`Welcome, ${user?.fullName ?? "Shopkeeper"}`}
-        description="Your shop overview and recent activity."
-      />
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Total Orders"
-          value={totalOrders.toLocaleString()}
-          icon={ShoppingCart}
-          isLoading={isLoading}
-        />
-
-        <StatCard
-          label="Pending Orders"
-          value={pendingOrders.toLocaleString()}
-          icon={ClipboardList}
-          isLoading={isLoading}
-        />
-
-        <StatCard
-          label="Delivered"
-          value={deliveredOrders.toLocaleString()}
-          icon={Truck}
-          isLoading={isLoading}
-        />
-
-        <StatCard
-          label="Completed"
-          value={completedOrders.toLocaleString()}
-          icon={CheckCircle2}
-          isLoading={isLoading}
-        />
+    <div className="space-y-8">
+      <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-card via-card to-primary/5 p-6 sm:p-8">
+        <div className="relative z-10">
+          <p className="text-sm font-medium text-muted-foreground">Your Shop Dashboard</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Welcome back, <span className="text-primary">{userName}</span>
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-lg">Here's your shop overview and recent activity.</p>
+        </div>
+        <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-primary/5 blur-3xl" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Total Spent"
-          value={formatINR(totalSpent)}
-          icon={DollarSign}
-          isLoading={isLoading}
-        />
+        <StatCard label="Total Orders" value={totalOrders.toLocaleString()} icon={ShoppingCart} accent="primary" isLoading={isLoading} />
+        <StatCard label="Pending Orders" value={pendingOrders.toLocaleString()} icon={ClipboardList} accent="warning" isLoading={isLoading} />
+        <StatCard label="Delivered" value={deliveredOrders.toLocaleString()} icon={Truck} accent="info" isLoading={isLoading} />
+        <StatCard label="Completed" value={completedOrders.toLocaleString()} icon={CheckCircle2} accent="success" isLoading={isLoading} />
+      </div>
 
-        <StatCard
-          label="Total Paid"
-          value={formatINR(totalPaid)}
-          icon={CreditCard}
-          isLoading={isLoading}
-        />
-
-        <StatCard
-          label="Outstanding"
-          value={formatINR(outstandingAmount)}
-          icon={DollarSign}
-          isLoading={isLoading}
-        />
-
-        <StatCard
-          label="Approved"
-          value={approvedOrders.toLocaleString()}
-          icon={Package}
-          isLoading={isLoading}
-        />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Total Spent" value={formatINR(totalSpent)} icon={DollarSign} accent="primary" isLoading={isLoading} />
+        <StatCard label="Total Paid" value={formatINR(totalPaid)} icon={CreditCard} accent="success" isLoading={isLoading} />
+        <StatCard label="Outstanding" value={formatINR(outstandingAmount)} icon={DollarSign} accent="warning" isLoading={isLoading} />
+        <StatCard label="Approved" value={approvedOrders.toLocaleString()} icon={Package} accent="info" isLoading={isLoading} />
       </div>
     </div>
   );

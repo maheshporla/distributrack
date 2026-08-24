@@ -141,7 +141,7 @@ export function ResetPasswordPage() {
             htmlFor="password"
             className="text-sm font-medium leading-none"
           >
-            New Password
+            New Password <span className="text-destructive">*</span>
           </label>
           <PasswordInput
             id="password"
@@ -163,7 +163,7 @@ export function ResetPasswordPage() {
             htmlFor="confirmPassword"
             className="text-sm font-medium leading-none"
           >
-            Confirm Password
+            Confirm Password <span className="text-destructive">*</span>
           </label>
           <PasswordInput
             id="confirmPassword"

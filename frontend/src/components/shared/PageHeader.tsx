@@ -16,9 +16,7 @@ interface PageHeaderProps {
 }
 
 /**
- * Standard header for every dashboard page: title + optional description
- * on the left, action buttons (e.g. "Add Product") on the right.
- * Keeps spacing/typography consistent across all feature modules.
+ * Premium page header with refined typography and optional breadcrumbs.
  */
 export function PageHeader({
   title,
@@ -36,7 +34,7 @@ export function PageHeader({
     >
       <div className="min-w-0">
         {breadcrumbs && breadcrumbs.length > 0 && (
-          <nav aria-label="Breadcrumb" className="mb-1.5">
+          <nav aria-label="Breadcrumb" className="mb-2">
             <ol className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
               {breadcrumbs.map((crumb, index) => (
                 <li key={crumb.label} className="flex items-center gap-1">
@@ -48,19 +46,21 @@ export function PageHeader({
                       {crumb.label}
                     </a>
                   ) : (
-                    <span>{crumb.label}</span>
+                    <span className="text-foreground/70">{crumb.label}</span>
                   )}
-                  {index < breadcrumbs.length - 1 && <span aria-hidden="true">/</span>}
+                  {index < breadcrumbs.length - 1 && (
+                    <span className="text-muted-foreground/50" aria-hidden="true">/</span>
+                  )}
                 </li>
               ))}
             </ol>
           </nav>
         )}
-        <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">
+        <h1 className="truncate text-2xl font-bold tracking-tight text-foreground">
           {title}
         </h1>
         {description && (
-          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{description}</p>
         )}
       </div>
 

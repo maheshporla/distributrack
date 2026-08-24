@@ -186,7 +186,7 @@ export function DeliveryWorkerForm({
             <Input
               id="password"
               type="password"
-              placeholder="At least 6 characters"
+              placeholder="6+ chars, A-Z, a-z, 0-9, @#$%"
               {...createForm.register("password")}
             />
 

@@ -1,16 +1,12 @@
 import { z } from "zod";
 
 /**
- * Backend validation reference (LoginRequest.java / RegisterRequest.java):
- *   - email:    @Email @NotBlank
- *   - password: @NotBlank (no complexity rule enforced server-side)
- *   - fullName: @NotBlank
- *   - phone:    @NotBlank
- *   - role:     @NotNull, one of RoleName
- *
- * The backend enforces no password complexity beyond "not blank". The
- * minimum length below is a client-only UX guard, not a backend
- * requirement — do not read it as mirroring server validation.
+ * Password validation mirrors the backend @ValidPassword rule:
+ *   - minimum 6 characters
+ *   - at least one uppercase letter (A-Z)
+ *   - at least one lowercase letter (a-z)
+ *   - at least one digit (0-9)
+ *   - at least one special character (@#$%^&*!)
  */
 
 const emailSchema = z
@@ -18,7 +14,13 @@ const emailSchema = z
   .min(1, "Email is required")
   .email("Enter a valid email address");
 
-const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+const passwordSchema = z
+  .string()
+  .min(6, "Password must be at least 6 characters")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/\d/, "Password must contain at least one digit")
+  .regex(/[@#$%^&*!]/, "Password must contain at least one special character (@#$%^&*!)");
 
 // ---------------------------------------------------------------------------
 // Login

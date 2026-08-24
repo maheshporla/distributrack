@@ -3,9 +3,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
 
 /**
- * Layout for every authenticated page (Dashboard, Products, Orders, ...).
- * Composes the persistent Sidebar + Navbar around the routed page content.
- * Wrapped around protected routes in AppRouter via <ProtectedRoute>.
+ * Premium dashboard layout with persistent sidebar and refined content area.
  */
 export function DashboardLayout() {
   return (
@@ -14,8 +12,8 @@ export function DashboardLayout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Navbar />
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-7xl">
+        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
+          <div className="mx-auto w-full max-w-[1400px]">
             <Outlet />
           </div>
         </main>

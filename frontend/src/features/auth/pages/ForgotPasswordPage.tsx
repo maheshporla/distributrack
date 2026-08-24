@@ -231,7 +231,7 @@ export function ForgotPasswordPage() {
           className="space-y-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="newPassword">New Password</Label>
+            <Label htmlFor="newPassword">New Password <span className="text-destructive">*</span></Label>
             <PasswordInput
               id="newPassword"
               autoComplete="new-password"
@@ -248,7 +248,7 @@ export function ForgotPasswordPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Label htmlFor="confirmPassword">Confirm Password <span className="text-destructive">*</span></Label>
             <PasswordInput
               id="confirmPassword"
               autoComplete="new-password"
@@ -318,7 +318,7 @@ export function ForgotPasswordPage() {
             className="space-y-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="otp">6-digit OTP</Label>
+              <Label htmlFor="otp">6-digit OTP <span className="text-destructive">*</span></Label>
               <Input
                 id="otp"
                 type="text"
@@ -392,7 +392,7 @@ export function ForgotPasswordPage() {
         className="space-y-4"
       >
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input

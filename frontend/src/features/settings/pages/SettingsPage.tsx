@@ -96,7 +96,23 @@ export function SettingsPage() {
     }
 
     if (newPassword.length < 6) {
-      toast.error("New password must be at least 6 characters long.");
+      toast.error("Password must be at least 6 characters long.");
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      toast.error("Password must contain at least one uppercase letter.");
+      return;
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      toast.error("Password must contain at least one lowercase letter.");
+      return;
+    }
+    if (!/\d/.test(newPassword)) {
+      toast.error("Password must contain at least one digit.");
+      return;
+    }
+    if (!/[@#$%^&*!]/.test(newPassword)) {
+      toast.error("Password must contain at least one special character (@#$%^&*!).");
       return;
     }
 
@@ -382,7 +398,7 @@ export function SettingsPage() {
                   <div className="space-y-4 max-w-md">
                     <div className="space-y-2">
                       <label htmlFor="settings-oldPassword" className="text-sm font-medium">
-                        Current Password *
+                        Current Password <span className="text-destructive">*</span>
                       </label>
                       <Input
                         id="settings-oldPassword"
@@ -395,20 +411,20 @@ export function SettingsPage() {
 
                     <div className="space-y-2">
                       <label htmlFor="settings-newPassword" className="text-sm font-medium">
-                        New Password *
+                        New Password <span className="text-destructive">*</span>
                       </label>
                       <Input
                         id="settings-newPassword"
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="At least 6 characters"
+                        placeholder="6+ chars, A-Z, a-z, 0-9, @#$%"
                       />
                     </div>
 
                     <div className="space-y-2">
                       <label htmlFor="settings-confirmPassword" className="text-sm font-medium">
-                        Confirm New Password *
+                        Confirm New Password <span className="text-destructive">*</span>
                       </label>
                       <Input
                         id="settings-confirmPassword"

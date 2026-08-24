@@ -11,15 +11,10 @@ interface SidebarNavProps {
 }
 
 /**
- * Renders the brand mark + grouped nav links. Shared between the
- * always-visible desktop Sidebar and the mobile Sheet drawer so the
- * two never drift out of sync.
+ * Premium sidebar navigation with dark chrome aesthetic.
+ * Shared between desktop Sidebar and mobile Sheet drawer.
  */
 export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
-  // Role-driven nav: items without `roles` are visible to everyone;
-  // items with `roles` are filtered against the JWT role claim so e.g.
-  // Warehouse management never appears for SALESMAN / DELIVERY_BOY /
-  // SHOPKEEPER. Empty sections are dropped entirely.
   const role = useAuthStore((state) => state.user?.role);
 
   const visibleSections = NAV_SECTIONS.map((section) => ({
@@ -31,27 +26,34 @@ export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
 
   return (
     <div className="flex h-full flex-col">
+      {/* Brand */}
       <div
         className={cn(
-          "flex h-16 items-center gap-2 px-4",
+          "flex h-16 items-center gap-3 px-4 border-b border-sidebar-border",
           collapsed && "justify-center px-2",
         )}
       >
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary">
-          <Package2 className="size-4.5 text-sidebar-primary-foreground" />
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sidebar-primary to-sidebar-primary/70 shadow-lg shadow-sidebar-primary/20">
+          <Package2 className="size-5 text-white" />
         </div>
         {!collapsed && (
-          <span className="truncate text-sm font-semibold text-sidebar-foreground">
-            {APP_NAME}
-          </span>
+          <div className="min-w-0">
+            <span className="block truncate text-[15px] font-bold tracking-tight text-sidebar-foreground">
+              {APP_NAME}
+            </span>
+            <span className="block text-[10px] font-medium uppercase tracking-widest text-sidebar-foreground/40">
+              Logistics Platform
+            </span>
+          </div>
         )}
       </div>
 
-      <nav className="flex-1 space-y-5 overflow-y-auto px-2 py-3 scrollbar-thin">
+      {/* Navigation */}
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4 scrollbar-thin">
         {visibleSections.map((section) => (
           <div key={section.title}>
             {!collapsed && (
-              <p className="mb-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
+              <p className="mb-2 px-2.5 text-[10px] font-bold uppercase tracking-[0.15em] text-sidebar-foreground/35">
                 {section.title}
               </p>
             )}
@@ -65,17 +67,27 @@ export function SidebarNav({ collapsed = false, onNavigate }: SidebarNavProps) {
                     title={collapsed ? item.label : undefined}
                     className={({ isActive }) =>
                       cn(
-                        "flex items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                        "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                        "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all duration-150",
+                        "text-sidebar-foreground/65",
+                        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                         collapsed && "justify-center px-2",
-                        isActive && "bg-sidebar-accent text-sidebar-accent-foreground",
+                        isActive && [
+                          "bg-sidebar-accent text-sidebar-accent-foreground",
+                          "shadow-sm shadow-sidebar-accent/50",
+                        ],
                       )
                     }
                   >
-                    <item.icon className="size-4.5 shrink-0" aria-hidden="true" />
+                    <item.icon
+                      className={cn(
+                        "size-[18px] shrink-0 transition-colors",
+                        "group-hover:text-sidebar-accent-foreground",
+                      )}
+                      aria-hidden="true"
+                    />
                     {!collapsed && <span className="truncate">{item.label}</span>}
                     {!collapsed && item.badge && (
-                      <span className="ml-auto rounded-full bg-sidebar-primary px-1.5 py-0.5 text-[10px] font-semibold text-sidebar-primary-foreground">
+                      <span className="ml-auto rounded-full bg-sidebar-primary/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
                         {item.badge}
                       </span>
                     )}

@@ -1,6 +1,7 @@
 package com.distributrack.dto.request;
 
 import com.distributrack.enums.RoleName;
+import com.distributrack.validation.ValidPassword;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -47,6 +48,7 @@ public class UpdateUserRequest {
      * or blank to keep the current password.
      */
     @Size(min = 6, max = 100, message = "Password must be between 6 and 100 characters")
+    @ValidPassword
     private String password;
 
     private Boolean emailNotificationsEnabled;
