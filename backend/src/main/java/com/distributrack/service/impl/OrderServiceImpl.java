@@ -4,17 +4,22 @@ import com.distributrack.dto.request.OrderItemRequest;
 import com.distributrack.dto.request.OrderRequest;
 import com.distributrack.dto.response.OrderItemResponse;
 import com.distributrack.dto.response.OrderResponse;
+import com.distributrack.entity.Inventory;
 import com.distributrack.entity.Order;
 import com.distributrack.entity.OrderItem;
 import com.distributrack.entity.Product;
+import com.distributrack.entity.StockMovement;
 import com.distributrack.entity.User;
 import com.distributrack.enums.OrderStatus;
 import com.distributrack.enums.RoleName;
+import com.distributrack.enums.StockMovementType;
 import com.distributrack.enums.WorkerAvailability;
 import com.distributrack.repository.DeliveryRepository;
+import com.distributrack.repository.InventoryRepository;
 import com.distributrack.repository.OrderItemRepository;
 import com.distributrack.repository.OrderRepository;
 import com.distributrack.repository.ProductRepository;
+import com.distributrack.repository.StockMovementRepository;
 import com.distributrack.repository.UserRepository;
 import com.distributrack.security.CurrentUserService;
 import com.distributrack.service.AuditService;
@@ -41,6 +46,8 @@ public class OrderServiceImpl implements OrderService {
     private final DeliveryRepository deliveryRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final InventoryRepository inventoryRepository;
+    private final StockMovementRepository stockMovementRepository;
     private final CurrentUserService currentUserService;
     private final NotificationService notificationService;
     private final AuditService auditService;
@@ -67,6 +74,52 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Order can only be created for a SHOPKEEPER account");
         }
 
+        // =================================================================
+        // STEP 1: Validate stock for ALL items before creating anything.
+        // Uses pessimistic locking to prevent overselling via concurrent
+        // orders. All inventory rows are locked in a consistent order to
+        // avoid deadlocks.
+        // =================================================================
+        List<OrderItemRequest> items = request.getItems();
+        if (items == null || items.isEmpty()) {
+            throw new RuntimeException("Order must contain at least one item");
+        }
+
+        // Sort by product id to acquire locks in a consistent order.
+        List<OrderItemRequest> sortedItems = items.stream()
+                .sorted(java.util.Comparator.comparingLong(OrderItemRequest::getProductId))
+                .toList();
+
+        List<Inventory> lockedInventories = new ArrayList<>();
+
+        for (OrderItemRequest itemRequest : sortedItems) {
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Product not found: id=" + itemRequest.getProductId()));
+
+            Inventory inventory = inventoryRepository.findByProduct(product)
+                    .orElseThrow(() -> new RuntimeException(
+                            "No inventory record for product: " + product.getProductName()));
+
+            // Acquire pessimistic write lock — blocks concurrent stock changes
+            // on this row until this transaction commits or rolls back.
+            Inventory locked = inventoryRepository.findByIdWithLock(inventory.getId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Inventory not found: id=" + inventory.getId()));
+
+            if (locked.getQuantity() < itemRequest.getQuantity()) {
+                throw new RuntimeException(
+                        "Insufficient stock for product: " + product.getProductName()
+                                + ". Available: " + locked.getQuantity()
+                                + ", Requested: " + itemRequest.getQuantity());
+            }
+
+            lockedInventories.add(locked);
+        }
+
+        // =================================================================
+        // STEP 2: All stock validated — now create the order.
+        // =================================================================
         Order order = Order.builder()
                 .orderNumber("ORD-" + UUID.randomUUID().toString().substring(0, 8))
                 .shopkeeper(shopkeeper)
@@ -77,13 +130,12 @@ public class OrderServiceImpl implements OrderService {
         order = orderRepository.save(order);
 
         BigDecimal totalAmount = BigDecimal.ZERO;
-
         List<OrderItem> orderItems = new ArrayList<>();
 
-        for (OrderItemRequest itemRequest : request.getItems()) {
-
-            Product product = productRepository.findById(itemRequest.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Product not found"));
+        for (int i = 0; i < sortedItems.size(); i++) {
+            OrderItemRequest itemRequest = sortedItems.get(i);
+            Inventory lockedInventory = lockedInventories.get(i);
+            Product product = lockedInventory.getProduct();
 
             BigDecimal subtotal = product.getPrice()
                     .multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
@@ -97,15 +149,37 @@ public class OrderServiceImpl implements OrderService {
                     .build();
 
             orderItems.add(orderItem);
-
             totalAmount = totalAmount.add(subtotal);
+
+            // =================================================================
+            // STEP 3: Deduct stock and record the movement — same transaction.
+            // =================================================================
+            int previousQuantity = lockedInventory.getQuantity();
+            lockedInventory.setQuantity(previousQuantity - itemRequest.getQuantity());
+            inventoryRepository.save(lockedInventory);
+
+            StockMovement movement = StockMovement.builder()
+                    .inventory(lockedInventory)
+                    .product(product)
+                    .warehouseLocation(lockedInventory.getWarehouseLocation())
+                    .type(StockMovementType.ORDER)
+                    .quantityChange(-itemRequest.getQuantity())
+                    .balanceAfter(lockedInventory.getQuantity())
+                    .note("Order " + order.getOrderNumber())
+                    .order(order)
+                    .createdBy(current.getId())
+                    .build();
+            stockMovementRepository.save(movement);
+
+            log.info("[STOCK] Deducted {} units of '{}' for order {} ({} -> {})",
+                    itemRequest.getQuantity(), product.getProductName(),
+                    order.getOrderNumber(), previousQuantity,
+                    lockedInventory.getQuantity());
         }
 
         orderItemRepository.saveAll(orderItems);
-
         order.setOrderItems(orderItems);
         order.setTotalAmount(totalAmount);
-
         orderRepository.save(order);
 
         notificationService.notifyOrderCreated(order);
@@ -151,20 +225,45 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return mapToResponse(order);
-    }
-
-    @Override
+    }    @Override
     @Transactional
     public OrderResponse updateOrderStatus(Long id, String status) {
+
 
         OrderStatus nextStatus = parseOrderStatus(status);
 
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Order not found with id: " + id));
 
+        // Capture the previous status to determine if stock restoration is needed.
+        OrderStatus previousStatus = order.getStatus();
+
         order.transitionTo(nextStatus);
 
         orderRepository.save(order);
+
+        // =================================================================
+        // STOCK RESTORATION: When an order is cancelled or rejected, restore
+        // the stock that was deducted at order creation time. This only
+        // happens when transitioning FROM a non-terminal state TO a terminal
+        // cancelling state, preventing double-restoration.
+        // =================================================================
+        if (nextStatus == OrderStatus.CANCELLED || nextStatus == OrderStatus.REJECTED) {
+            // Only restore if the order previously had stock deducted
+            // (i.e. was in a pre-terminal state, not already cancelled/rejected).
+            boolean wasPreTerminal = previousStatus != OrderStatus.CANCELLED
+                    && previousStatus != OrderStatus.REJECTED
+                    && previousStatus != OrderStatus.COMPLETED;
+
+            if (wasPreTerminal && !Boolean.TRUE.equals(order.getStockRestored())) {
+                restoreStockForOrder(order);
+                order.setStockRestored(true);
+                orderRepository.save(order);
+
+                log.info("[STOCK] Restored stock for order {} (status {} -> {})",
+                        order.getOrderNumber(), previousStatus, nextStatus);
+            }
+        }
 
         // When order is approved, auto-create an AVAILABLE delivery
         // so online workers can accept it.
@@ -184,6 +283,59 @@ public class OrderServiceImpl implements OrderService {
                 "Order " + order.getOrderNumber() + " status changed to " + nextStatus);
 
         return mapToResponse(order);
+    }
+
+    /**
+     * Restore stock for all items in a cancelled/rejected order.
+     * Uses pessimistic locking to prevent race conditions during restoration.
+     * Each restoration is recorded as a CANCELLATION movement in stock_movements.
+     */
+    private void restoreStockForOrder(Order order) {
+        User current = currentUserService.getCurrentUser();
+
+        for (OrderItem item : order.getOrderItems()) {
+            Product product = item.getProduct();
+
+            Inventory inventory = inventoryRepository.findByProduct(product)
+                    .orElse(null);
+            if (inventory == null) {
+                log.warn("[STOCK] No inventory found for product '{}' — cannot restore stock",
+                        product.getProductName());
+                continue;
+            }
+
+            // Pessimistic lock to prevent concurrent modification.
+            Inventory locked = inventoryRepository.findByIdWithLock(inventory.getId())
+                    .orElse(null);
+            if (locked == null) {
+                log.warn("[STOCK] Inventory disappeared for product '{}' — skipping restore",
+                        product.getProductName());
+                continue;
+            }
+
+            int previousQuantity = locked.getQuantity();
+            locked.setQuantity(previousQuantity + item.getQuantity());
+            inventoryRepository.save(locked);
+
+            StockMovement movement = StockMovement.builder()
+                    .inventory(locked)
+                    .product(product)
+                    .warehouseLocation(locked.getWarehouseLocation())
+                    .type(StockMovementType.CANCELLATION)
+                    .quantityChange(item.getQuantity())
+                    .balanceAfter(locked.getQuantity())
+                    .note("Restored from " + order.getOrderNumber()
+                            + " (" + order.getStatus() + ")")
+                    .order(order)
+                    .createdBy(current.getId())
+                    .build();
+            stockMovementRepository.save(movement);
+
+            log.info("[STOCK] Restored {} units of '{}' from order {} ({} -> {})",
+                    item.getQuantity(), product.getProductName(),
+                    order.getOrderNumber(), previousQuantity,
+                    locked.getQuantity());
+        }
     }
 
     /**

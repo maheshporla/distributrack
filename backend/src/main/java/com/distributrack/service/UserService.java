@@ -34,6 +34,16 @@ public interface UserService {
      */
     void deleteUser(Long id);
 
+    /**
+     * Permanently deletes a user from the database. Only allowed when
+     * the user has no business records (orders, deliveries, earnings).
+     * Cleans up session/token records before deletion. The user's email
+     * can be reused after successful deletion.
+     *
+     * @return a message describing the outcome
+     */
+    String permanentDeleteUser(Long id);
+
     // --- Delivery Partner Applications ---
 
     /** List pending (disabled) delivery partner applications. */

@@ -7,11 +7,9 @@ import com.distributrack.entity.Role;
 import com.distributrack.entity.User;
 import com.distributrack.enums.RoleName;
 import com.distributrack.enums.WorkerAvailability;
-import com.distributrack.repository.RoleRepository;
-import com.distributrack.repository.UserRepository;
+import com.distributrack.repository.*;
 import com.distributrack.security.CurrentUserService;
 import com.distributrack.entity.PasswordResetToken;
-import com.distributrack.repository.PasswordResetTokenRepository;
 import com.distributrack.service.AuditService;
 import com.distributrack.service.NotificationService;
 import com.distributrack.service.UserService;
@@ -40,6 +38,12 @@ public class UserServiceImpl implements UserService {
     private final AuditService auditService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final NotificationService notificationService;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final OrderRepository orderRepository;
+    private final DeliveryRepository deliveryRepository;
+    private final DeliveryBatchRepository deliveryBatchRepository;
+    private final DeliveryEarningRepository deliveryEarningRepository;
+    private final NotificationRepository notificationRepository;
 
     // ------------------------------------------------------------------
     // Role matrix — who may create/manage which roles.
@@ -298,6 +302,89 @@ public class UserServiceImpl implements UserService {
 
         auditService.log("USER_DISABLE", "User", user.getId(),
                 user.getRole().getName() + " account disabled: " + user.getEmail());
+    }
+
+    @Override
+    public String permanentDeleteUser(Long id) {
+
+        User current = currentUserService.getCurrentUser();
+        RoleName actorRole = current.getRole().getName();
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+
+        // --- Authorization checks ---
+
+        // Cannot delete yourself.
+        if (user.getId().equals(current.getId())) {
+            throw new RuntimeException("You cannot delete your own account");
+        }
+
+        // Cannot delete SUPER_ADMIN through user management.
+        if (user.getRole().getName() == RoleName.SUPER_ADMIN) {
+            throw new RuntimeException("SUPER_ADMIN accounts cannot be deleted through user management");
+        }
+
+        // Must have authority over the target's current role.
+        if (!canManageRole(actorRole, user.getRole().getName())) {
+            throw new RuntimeException(
+                    "Your role (" + actorRole + ") cannot delete a " + user.getRole().getName() + " account"
+            );
+        }
+
+        // --- Check for business records that block deletion ---
+
+        List<String> blockingReasons = new java.util.ArrayList<>();
+
+        long orderCount = orderRepository.findByShopkeeper(user).size();
+        if (orderCount > 0) {
+            blockingReasons.add(orderCount + " order(s)");
+        }
+
+        long deliveryCount = deliveryRepository.findByDeliveryBoy(user).size();
+        if (deliveryCount > 0) {
+            blockingReasons.add(deliveryCount + " delivery/deliveries");
+        }
+
+        long batchCount = deliveryBatchRepository.findByDeliveryBoyOrderByAssignedAtDesc(user).size();
+        if (batchCount > 0) {
+            blockingReasons.add(batchCount + " delivery batch(es)");
+        }
+
+        long earningCount = deliveryEarningRepository.findByDeliveryBoyOrderByEarnedAtDesc(user).size();
+        if (earningCount > 0) {
+            blockingReasons.add(earningCount + " earning record(s)");
+        }
+
+        if (!blockingReasons.isEmpty()) {
+            String reason = String.join(", ", blockingReasons);
+            throw new RuntimeException(
+                    "This user cannot be permanently deleted because they have associated business records: "
+                            + reason + ". Disable the account instead."
+            );
+        }
+
+        // --- Safe to delete: clean up dependent records first ---
+
+        // 1. Delete refresh tokens (session data)
+        refreshTokenRepository.deleteByUserId(user.getId());
+
+        // 2. Delete password reset tokens
+        passwordResetTokenRepository.deleteByUserId(user.getId());
+
+        // 3. Delete notifications (system messages for this user)
+        notificationRepository.deleteByRecipient(user);
+
+        // 4. Hard delete the user
+        userRepository.delete(user);
+
+        log.info("[USER-DELETE] Permanently deleted user id={}, email={}, role={}",
+                user.getId(), user.getEmail(), user.getRole().getName());
+
+        auditService.log("USER_PERMANENT_DELETE", "User", user.getId(),
+                user.getRole().getName() + " account permanently deleted: " + user.getEmail());
+
+        return "User permanently deleted successfully";
     }
 
     private UserResponse mapToResponse(User user) {

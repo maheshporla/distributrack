@@ -3,6 +3,7 @@ package com.distributrack.service;
 import com.distributrack.dto.request.OrderItemRequest;
 import com.distributrack.dto.request.OrderRequest;
 import com.distributrack.dto.response.OrderResponse;
+import com.distributrack.entity.Inventory;
 import com.distributrack.entity.Order;
 import com.distributrack.entity.Product;
 import com.distributrack.entity.Role;
@@ -10,9 +11,11 @@ import com.distributrack.entity.User;
 import com.distributrack.enums.OrderStatus;
 import com.distributrack.enums.RoleName;
 import com.distributrack.repository.DeliveryRepository;
+import com.distributrack.repository.InventoryRepository;
 import com.distributrack.repository.OrderItemRepository;
 import com.distributrack.repository.OrderRepository;
 import com.distributrack.repository.ProductRepository;
+import com.distributrack.repository.StockMovementRepository;
 import com.distributrack.repository.UserRepository;
 import com.distributrack.security.CurrentUserService;
 import com.distributrack.service.NotificationService;
@@ -35,6 +38,8 @@ class OrderServiceImplTest {
     private final OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
     private final ProductRepository productRepository = mock(ProductRepository.class);
     private final UserRepository userRepository = mock(UserRepository.class);
+    private final InventoryRepository inventoryRepository = mock(InventoryRepository.class);
+    private final StockMovementRepository stockMovementRepository = mock(StockMovementRepository.class);
     private final CurrentUserService currentUserService = mock(CurrentUserService.class);
     private final NotificationService notificationService = mock(NotificationService.class);
     private final AuditService auditService = mock(AuditService.class);
@@ -46,6 +51,8 @@ class OrderServiceImplTest {
             deliveryRepository,
             productRepository,
             userRepository,
+            inventoryRepository,
+            stockMovementRepository,
             currentUserService,
             notificationService,
             auditService
@@ -86,6 +93,19 @@ class OrderServiceImplTest {
                 .price(new BigDecimal("50.00"))
                 .build();
         when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+
+        // Mock inventory with sufficient stock for the order.
+        Inventory inventory = Inventory.builder()
+                .id(1L)
+                .product(product)
+                .quantity(100)
+                .minimumStock(10)
+                .maximumStock(500)
+                .warehouseLocation("Main Warehouse")
+                .active(true)
+                .build();
+        when(inventoryRepository.findByProduct(product)).thenReturn(Optional.of(inventory));
+        when(inventoryRepository.findByIdWithLock(1L)).thenReturn(Optional.of(inventory));
 
         // The request tries to place the order for shopkeeper 2 — must be ignored.
         OrderRequest request = OrderRequest.builder()

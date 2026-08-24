@@ -61,6 +61,16 @@ public class UserController {
         return "User disabled successfully";
     }
 
+    /**
+     * Permanently delete a user. Only allowed when the user has no
+     * business records (orders, deliveries, earnings). The user's email
+     * can be reused after successful deletion.
+     */
+    @DeleteMapping("/{id}/permanent")
+    public String permanentDeleteUser(@PathVariable Long id) {
+        return userService.permanentDeleteUser(id);
+    }
+
     // --- Delivery Partner Applications ---
 
     @GetMapping("/delivery-applications")

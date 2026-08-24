@@ -24,4 +24,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("update Notification n set n.read = true "
             + "where n.recipient = :recipient and n.read = false")
     int markAllRead(@Param("recipient") User recipient);
+
+    /** Deletes all notifications for the given recipient. */
+    void deleteByRecipient(User recipient);
 }

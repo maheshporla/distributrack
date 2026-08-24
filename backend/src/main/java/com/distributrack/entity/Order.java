@@ -42,6 +42,15 @@ public class Order {
     @Column(nullable = false, length = 32)
     private OrderStatus status;
 
+    /**
+     * True once stock has been restored for this order (on cancellation/
+     * rejection). Prevents double-restoration if the status is updated
+     * multiple times.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean stockRestored = false;
+
     @Column(nullable = false)
     private LocalDateTime orderDate;
 

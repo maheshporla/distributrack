@@ -300,6 +300,7 @@ public class InventoryServiceImpl implements InventoryService {
                 .balanceAfter(movement.getBalanceAfter())
                 .note(movement.getNote())
                 .createdBy(movement.getCreatedBy())
+                .orderId(movement.getOrder() != null ? movement.getOrder().getId() : null)
                 .createdAt(movement.getCreatedAt())
                 .build();
     }

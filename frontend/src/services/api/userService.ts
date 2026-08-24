@@ -33,4 +33,13 @@ export const userService = {
   async deleteUser(id: number): Promise<void> {
     await axiosInstance.delete(`/users/${id}`);
   },
+
+  /**
+   * Permanently delete a user. Only allowed when the user has no
+   * business records. Returns a message string on success.
+   */
+  async permanentDeleteUser(id: number): Promise<string> {
+    const response = await axiosInstance.delete<string>(`/users/${id}/permanent`);
+    return response.data;
+  },
 };

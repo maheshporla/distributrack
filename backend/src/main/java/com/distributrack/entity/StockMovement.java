@@ -57,6 +57,11 @@ public class StockMovement {
     @Column(name = "created_by")
     private Long createdBy;
 
+    /** Optional reference to the order that triggered this movement. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "order_id")
+    private Order order;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

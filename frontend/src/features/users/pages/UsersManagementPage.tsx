@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Search, UserCog, UserX, UserCheck, Eye } from "lucide-react";
+import { Pencil, Plus, Search, UserCog, UserX, UserCheck, Eye, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -146,6 +146,35 @@ export function UsersManagementPage() {
       toast.error(error.message || "Failed to update user status");
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  // =========================================================
+  // Permanent delete
+  // =========================================================
+
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const handlePermanentDelete = async (target: UserProfile) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete ${target.fullName} (${target.email})?\n\nThis action cannot be undone. The user's email will be freed for reuse.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(target.id);
+      await userService.permanentDeleteUser(target.id);
+      toast.success(`${target.fullName} has been permanently deleted`);
+      setUsers((prev) => prev.filter((u) => u.id !== target.id));
+      if (selectedUser?.id === target.id) {
+        setSelectedUser(null);
+        setView("list");
+      }
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Failed to delete user");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -404,6 +433,21 @@ export function UsersManagementPage() {
                                   </>
                                 )}
                               </Button>
+
+                              {/* Permanent delete — only for SUPER_ADMIN/OWNER */}
+                              {currentUser?.role === "SUPER_ADMIN" ||
+                              currentUser?.role === "OWNER" ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => handlePermanentDelete(u)}
+                                  disabled={deletingId === u.id}
+                                >
+                                  <Trash2 className="mr-1 h-4 w-4" />
+                                  Delete
+                                </Button>
+                              ) : null}
                             </>
                           )}
                         </div>

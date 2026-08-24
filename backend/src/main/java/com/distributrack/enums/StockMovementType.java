@@ -12,5 +12,8 @@ package com.distributrack.enums;
 public enum StockMovementType {
     IN,
     OUT,
-    ADJUSTMENT
+    ADJUSTMENT,
+    ORDER,
+    CANCELLATION,
+    RESTOCK
 }

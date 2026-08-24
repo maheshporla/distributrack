@@ -32,5 +32,7 @@ public class StockMovementResponse {
 
     private Long createdBy;
 
+    private Long orderId;
+
     private LocalDateTime createdAt;
 }

@@ -7,12 +7,9 @@ import com.distributrack.entity.Role;
 import com.distributrack.entity.User;
 import com.distributrack.enums.RoleName;
 import com.distributrack.enums.WorkerAvailability;
-import com.distributrack.repository.RoleRepository;
-import com.distributrack.repository.UserRepository;
+import com.distributrack.repository.*;
 import com.distributrack.security.CurrentUserService;
 import com.distributrack.service.impl.UserServiceImpl;
-import com.distributrack.repository.PasswordResetTokenRepository;
-import com.distributrack.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,10 +30,18 @@ class UserServiceImplTest {
     private final AuditService auditService = mock(AuditService.class);
     private final PasswordResetTokenRepository passwordResetTokenRepository = mock(PasswordResetTokenRepository.class);
     private final NotificationService notificationService = mock(NotificationService.class);
+    private final RefreshTokenRepository refreshTokenRepository = mock(RefreshTokenRepository.class);
+    private final OrderRepository orderRepository = mock(OrderRepository.class);
+    private final DeliveryRepository deliveryRepository = mock(DeliveryRepository.class);
+    private final DeliveryBatchRepository deliveryBatchRepository = mock(DeliveryBatchRepository.class);
+    private final DeliveryEarningRepository deliveryEarningRepository = mock(DeliveryEarningRepository.class);
+    private final NotificationRepository notificationRepository = mock(NotificationRepository.class);
 
     private final UserServiceImpl userService = new UserServiceImpl(
             userRepository, roleRepository, passwordEncoder, currentUserService, auditService,
-            passwordResetTokenRepository, notificationService
+            passwordResetTokenRepository, notificationService,
+            refreshTokenRepository, orderRepository, deliveryRepository,
+            deliveryBatchRepository, deliveryEarningRepository, notificationRepository
     );
 
     private User admin;
