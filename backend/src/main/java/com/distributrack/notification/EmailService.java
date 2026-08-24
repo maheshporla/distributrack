@@ -8,7 +8,7 @@ package com.distributrack.notification;
 public interface EmailService {
 
     /**
-     * Send an HTML email. In mock mode (no MAIL_HOST configured, or
+     * Send an HTML email. In mock mode (no RESEND_API_KEY configured, or
      * EMAIL_ENABLED=false) the email is only logged.
      */
     void send(String to, String subject, String htmlBody);

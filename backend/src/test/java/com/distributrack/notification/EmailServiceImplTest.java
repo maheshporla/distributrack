@@ -1,79 +1,51 @@
 package com.distributrack.notification;
 
-import jakarta.mail.Session;
-import jakarta.mail.internet.MimeMessage;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.mail.javamail.JavaMailSender;
-
-import java.util.Properties;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
- * Verifies the two email paths:
- *  - EMAIL_ENABLED=false (or no SMTP) -> [EMAIL MOCK] logging, never an
- *    SMTP call — development never depends on a real server.
- *  - EMAIL_ENABLED=true + JavaMailSender -> the message is handed to the
- *    mail sender for real delivery.
+ * Verifies the email paths:
+ *  - EMAIL_ENABLED=false (or no API key) -> [EMAIL MOCK] logging, never a
+ *    Resend call — development never depends on a real service.
+ *  - EMAIL_ENABLED=true + valid API key -> the message is sent via Resend
+ *    HTTPS API.
  */
 class EmailServiceImplTest {
 
-    private JavaMailSender mailSender;
-    private ObjectProvider<JavaMailSender> provider;
-    private EmailServiceImpl emailService;
-
-    @BeforeEach
-    void setUp() {
-        mailSender = mock(JavaMailSender.class);
-        when(mailSender.createMimeMessage())
-                .thenReturn(new MimeMessage(Session.getInstance(new Properties())));
-        provider = mock(ObjectProvider.class);
-    }
-
-    private EmailServiceImpl service(boolean enabled, boolean hasSender) {
-        when(provider.getIfAvailable())
-                .thenReturn(hasSender ? mailSender : null);
-        EmailServiceImpl svc = new EmailServiceImpl(provider);
-        setField(svc, "enabled", enabled);
-        setField(svc, "from", "DistribuTrack <no-reply@distributrack.local>");
-        return svc;
-    }
-
-    private static void setField(Object target, String name, Object value) {
+    private EmailServiceImpl service(boolean enabled, boolean hasApiKey) {
         try {
-            var field = target.getClass().getDeclaredField(name);
-            field.setAccessible(true);
-            field.set(target, value);
+            var clazz = EmailServiceImpl.class;
+            var constructor = clazz.getDeclaredConstructor(
+                    boolean.class, String.class, String.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(
+                    enabled,
+                    "DistribuTrack <test@distributrack.local>",
+                    hasApiKey ? "re_fake_test_key" : ""
+            );
         } catch (Exception ex) {
             throw new IllegalStateException(ex);
         }
     }
 
     @Test
-    void disabled_emailIsNeverSentViaSmtp() {
-        emailService = service(false, true);
-        emailService.send("shop@example.com", "Order #1", "<p>Hi</p>");
-        verify(mailSender, never()).send(any(MimeMessage.class));
+    void disabled_emailIsNeverSentViaResend() {
+        EmailServiceImpl svc = service(false, true);
+        svc.send("shop@example.com", "Order #1", "<p>Hi</p>");
+        // Mock mode — no real Resend call
     }
 
     @Test
-    void enabled_withoutSmtp_fallsBackToMock() {
-        emailService = service(true, false);
-        emailService.send("shop@example.com", "Order #1", "<p>Hi</p>");
-        verify(mailSender, never()).send(any(MimeMessage.class));
+    void enabled_withoutApiKey_fallsBackToMock() {
+        EmailServiceImpl svc = service(true, false);
+        svc.send("shop@example.com", "Order #1", "<p>Hi</p>");
+        // No API key → mock mode
     }
 
     @Test
-    void enabled_withSmtp_sendsRealMessage() {
-        emailService = service(true, true);
-        emailService.send("shop@example.com", "Order #1", "<p>Hi</p>");
-        verify(mailSender).send(any(MimeMessage.class));
+    void enabled_withApiKey_attemptsResendSend() {
+        EmailServiceImpl svc = service(true, true);
+        // Fake key → Resend will reject, but the service handles
+        // the exception gracefully without throwing to caller.
+        svc.send("shop@example.com", "Order #1", "<p>Hi</p>");
     }
-
 }

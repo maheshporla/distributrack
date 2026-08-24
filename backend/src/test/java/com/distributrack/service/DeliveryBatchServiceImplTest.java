@@ -710,6 +710,7 @@ class DeliveryBatchServiceImplTest {
                 .assignedAt(LocalDateTime.now())
                 .build();
 
+        when(currentUserService.getCurrentUser()).thenReturn(adminUser);
         when(deliveryBatchRepository.findById(1L)).thenReturn(Optional.of(batch));
         when(deliveryBatchRepository.save(any(DeliveryBatch.class))).thenAnswer(inv -> inv.getArgument(0));
 

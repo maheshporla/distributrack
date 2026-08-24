@@ -461,4 +461,300 @@ class UserServiceImplTest {
         assertThrows(RuntimeException.class,
                 () -> userService.getDeliveryBoyStatistics());
     }
+
+    // ===================================================================
+    // Role Authorization Tests
+    // ===================================================================
+
+    private User userWithRole(RoleName roleName) {
+        return User.builder()
+                .id(100L + roleName.ordinal())
+                .fullName(roleName + " User")
+                .email(roleName.name().toLowerCase() + "@test.com")
+                .phone("900000000" + roleName.ordinal())
+                .enabled(true)
+                .role(new Role((long) (roleName.ordinal() + 1), roleName))
+                .build();
+    }
+
+    // --- Owner cannot create another Owner ---
+
+    @Test
+    void ownerCannotCreateAnotherOwner() {
+        User owner = userWithRole(RoleName.OWNER);
+        when(currentUserService.getCurrentUser()).thenReturn(owner);
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.createUser(request(RoleName.OWNER)));
+
+        assertTrue(ex.getMessage().contains("cannot create"));
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void ownerCanCreateManager() {
+        User owner = userWithRole(RoleName.OWNER);
+        when(currentUserService.getCurrentUser()).thenReturn(owner);
+
+        UserResponse response = userService.createUser(request(RoleName.MANAGER));
+
+        assertEquals(RoleName.MANAGER, response.getRole());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void ownerCanCreateSalesman() {
+        User owner = userWithRole(RoleName.OWNER);
+        when(currentUserService.getCurrentUser()).thenReturn(owner);
+
+        UserResponse response = userService.createUser(request(RoleName.SALESMAN));
+
+        assertEquals(RoleName.SALESMAN, response.getRole());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void ownerCanCreateDeliveryBoy() {
+        User owner = userWithRole(RoleName.OWNER);
+        when(currentUserService.getCurrentUser()).thenReturn(owner);
+
+        UserResponse response = userService.createUser(request(RoleName.DELIVERY_BOY));
+
+        assertEquals(RoleName.DELIVERY_BOY, response.getRole());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void ownerCanCreateShopkeeper() {
+        User owner = userWithRole(RoleName.OWNER);
+        when(currentUserService.getCurrentUser()).thenReturn(owner);
+
+        UserResponse response = userService.createUser(request(RoleName.SHOPKEEPER));
+
+        assertEquals(RoleName.SHOPKEEPER, response.getRole());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void ownerCannotCreateSuperAdmin() {
+        User owner = userWithRole(RoleName.OWNER);
+        when(currentUserService.getCurrentUser()).thenReturn(owner);
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.createUser(request(RoleName.SUPER_ADMIN)));
+
+        assertTrue(ex.getMessage().contains("SUPER_ADMIN"));
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    // --- Manager cannot create Owner ---
+
+    @Test
+    void managerCannotCreateOwner_role() {
+        User manager = userWithRole(RoleName.MANAGER);
+        when(currentUserService.getCurrentUser()).thenReturn(manager);
+
+        assertThrows(RuntimeException.class,
+                () -> userService.createUser(request(RoleName.OWNER)));
+    }
+
+    @Test
+    void managerCannotCreateSuperAdmin() {
+        User manager = userWithRole(RoleName.MANAGER);
+        when(currentUserService.getCurrentUser()).thenReturn(manager);
+
+        assertThrows(RuntimeException.class,
+                () -> userService.createUser(request(RoleName.SUPER_ADMIN)));
+    }
+
+    @Test
+    void managerCanCreateSalesman() {
+        User manager = userWithRole(RoleName.MANAGER);
+        when(currentUserService.getCurrentUser()).thenReturn(manager);
+
+        UserResponse response = userService.createUser(request(RoleName.SALESMAN));
+
+        assertEquals(RoleName.SALESMAN, response.getRole());
+        verify(userRepository).save(any(User.class));
+    }
+
+    // --- Salesman cannot create any users ---
+
+    @Test
+    void salesmanCannotCreateAnyUsers() {
+        User salesman = userWithRole(RoleName.SALESMAN);
+        when(currentUserService.getCurrentUser()).thenReturn(salesman);
+
+        for (RoleName target : RoleName.values()) {
+            if (target == RoleName.SUPER_ADMIN) continue; // Already tested above
+            assertThrows(RuntimeException.class,
+                    () -> userService.createUser(request(target)),
+                    "Salesman should not be able to create " + target);
+        }
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    // --- Delivery Boy cannot create any users ---
+
+    @Test
+    void deliveryBoyCannotCreateAnyUsers() {
+        User deliveryBoy = userWithRole(RoleName.DELIVERY_BOY);
+        when(currentUserService.getCurrentUser()).thenReturn(deliveryBoy);
+
+        for (RoleName target : RoleName.values()) {
+            if (target == RoleName.SUPER_ADMIN) continue;
+            assertThrows(RuntimeException.class,
+                    () -> userService.createUser(request(target)),
+                    "DeliveryBoy should not be able to create " + target);
+        }
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    // --- Shopkeeper cannot create any users ---
+
+    @Test
+    void shopkeeperCannotCreateAnyUsers() {
+        User shopUser = userWithRole(RoleName.SHOPKEEPER);
+        when(currentUserService.getCurrentUser()).thenReturn(shopUser);
+
+        for (RoleName target : RoleName.values()) {
+            if (target == RoleName.SUPER_ADMIN) continue;
+            assertThrows(RuntimeException.class,
+                    () -> userService.createUser(request(target)),
+                    "Shopkeeper should not be able to create " + target);
+        }
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    // --- Self role change prevention ---
+
+    @Test
+    void shopkeeperCannotChangeOwnRole() {
+        User shopUser = userWithRole(RoleName.SHOPKEEPER);
+        when(currentUserService.getCurrentUser()).thenReturn(shopUser);
+        when(userRepository.findById(shopUser.getId())).thenReturn(Optional.of(shopUser));
+
+        UpdateUserRequest req = UpdateUserRequest.builder()
+                .fullName("Shop One")
+                .email(shopUser.getEmail())
+                .phone(shopUser.getPhone())
+                .role(RoleName.OWNER)
+                .enabled(true)
+                .build();
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.updateUser(shopUser.getId(), req));
+
+        assertTrue(ex.getMessage().contains("cannot change your own role"));
+    }
+
+    @Test
+    void deliveryBoyCannotChangeOwnRole() {
+        User boy = userWithRole(RoleName.DELIVERY_BOY);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+        when(userRepository.findById(boy.getId())).thenReturn(Optional.of(boy));
+
+        UpdateUserRequest req = UpdateUserRequest.builder()
+                .fullName("Ravi")
+                .email(boy.getEmail())
+                .phone(boy.getPhone())
+                .role(RoleName.OWNER)
+                .enabled(true)
+                .build();
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.updateUser(boy.getId(), req));
+
+        assertTrue(ex.getMessage().contains("cannot change your own role"));
+    }
+
+    // --- Unauthorized user cannot modify another user's role ---
+
+    @Test
+    void shopkeeperCannotModifyAnotherUsersRole() {
+        User shopUser = userWithRole(RoleName.SHOPKEEPER);
+        User target = userWithRole(RoleName.DELIVERY_BOY);
+        when(currentUserService.getCurrentUser()).thenReturn(shopUser);
+        when(userRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        UpdateUserRequest req = UpdateUserRequest.builder()
+                .fullName("Ravi")
+                .email(target.getEmail())
+                .phone(target.getPhone())
+                .role(RoleName.OWNER)
+                .enabled(true)
+                .build();
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.updateUser(target.getId(), req));
+
+        assertTrue(ex.getMessage().contains("cannot manage"));
+    }
+
+    @Test
+    void deliveryBoyCannotModifyAnotherUsersRole() {
+        User boy = userWithRole(RoleName.DELIVERY_BOY);
+        User target = userWithRole(RoleName.SHOPKEEPER);
+        when(currentUserService.getCurrentUser()).thenReturn(boy);
+        when(userRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        UpdateUserRequest req = UpdateUserRequest.builder()
+                .fullName("Shop")
+                .email(target.getEmail())
+                .phone(target.getPhone())
+                .role(RoleName.OWNER)
+                .enabled(true)
+                .build();
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.updateUser(target.getId(), req));
+
+        assertTrue(ex.getMessage().contains("cannot manage"));
+    }
+
+    // --- Owner cannot assign SUPER_ADMIN role ---
+
+    @Test
+    void ownerCannotAssignSuperAdminRoleToUser() {
+        User owner = userWithRole(RoleName.OWNER);
+        User target = userWithRole(RoleName.SHOPKEEPER);
+        when(currentUserService.getCurrentUser()).thenReturn(owner);
+        when(userRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        UpdateUserRequest req = UpdateUserRequest.builder()
+                .fullName("Shop")
+                .email(target.getEmail())
+                .phone(target.getPhone())
+                .role(RoleName.SUPER_ADMIN)
+                .enabled(true)
+                .build();
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.updateUser(target.getId(), req));
+
+        assertTrue(ex.getMessage().contains("SUPER_ADMIN"));
+    }
+
+    // --- Owner cannot assign OWNER role to another user ---
+
+    @Test
+    void ownerCannotAssignOwnerRoleToAnotherUser() {
+        User owner = userWithRole(RoleName.OWNER);
+        User target = userWithRole(RoleName.MANAGER);
+        when(currentUserService.getCurrentUser()).thenReturn(owner);
+        when(userRepository.findById(target.getId())).thenReturn(Optional.of(target));
+
+        UpdateUserRequest req = UpdateUserRequest.builder()
+                .fullName("Manager")
+                .email(target.getEmail())
+                .phone(target.getPhone())
+                .role(RoleName.OWNER)
+                .enabled(true)
+                .build();
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.updateUser(target.getId(), req));
+
+        assertTrue(ex.getMessage().contains("cannot assign"));
+    }
 }

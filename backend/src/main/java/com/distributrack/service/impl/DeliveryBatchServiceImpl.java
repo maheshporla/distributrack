@@ -396,11 +396,19 @@ public class DeliveryBatchServiceImpl implements DeliveryBatchService {
         DeliveryBatch batch = deliveryBatchRepository.findById(batchId)
                 .orElseThrow(() -> new RuntimeException("Delivery batch not found: " + batchId));
 
+        User current = currentUserService.getCurrentUser();
+
+        // DELIVERY_BOY can only complete their own batches.
+        if (current.getRole().getName() == RoleName.DELIVERY_BOY
+                && !batch.getDeliveryBoy().getId().equals(current.getId())) {
+            throw new RuntimeException("Access denied: this is not your batch");
+        }
+
         batch.setStatus(DeliveryBatchStatus.COMPLETED);
         batch.setCompletedAt(LocalDateTime.now());
         batch = deliveryBatchRepository.save(batch);
 
-        log.info("[BATCH] Batch {} completed", batch.getBatchNumber());
+        log.info("[BATCH] Batch {} completed by {}", batch.getBatchNumber(), current.getFullName());
 
         return buildBatchResponseFromBatch(batch);
     }

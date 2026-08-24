@@ -24,21 +24,11 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-public class StartupConfigValidator {
-
-    @Value("${app.notifications.email.enabled:false}")
+public class StartupConfigValidator {    @Value("${app.notifications.email.enabled:false}")
     private boolean emailEnabled;
 
-    @Value("${spring.mail.host:}")
-    private String mailHost;
-
-    @Value("${spring.mail.username:}")
-    private String mailUsername;
-
-    @Value("${spring.mail.password:}")
-    private String mailPassword;
-
-
+    @Value("${app.notifications.email.resend-api-key:}")
+    private String resendApiKey;
 
     @Value("${app.notifications.email.from:}")
     private String from;
@@ -78,27 +68,27 @@ public class StartupConfigValidator {
         boolean hasIssues = false;
 
         // =========================================================
-        // Email validation
+        // Email validation (Resend HTTPS API)
         // =========================================================
         if (emailEnabled) {
-            if (isBlank(mailHost)) {
+            if (isBlank(resendApiKey)) {
                 log.error("╔══════════════════════════════════════════════════════════════╗");
                 log.error("║  EMAIL CONFIGURATION ERROR                                  ║");
-                log.error("║  EMAIL_ENABLED=true but MAIL_HOST is not set.               ║");
+                log.error("║  EMAIL_ENABLED=true but RESEND_API_KEY is not set.          ║");
                 log.error("║  Emails will be logged as [EMAIL MOCK] instead.            ║");
-                log.error("║  Set MAIL_HOST, MAIL_USERNAME, MAIL_PASSWORD to fix.       ║");
+                log.error("║  Set RESEND_API_KEY in your environment variables.         ║");
                 log.error("╚══════════════════════════════════════════════════════════════╝");
                 hasIssues = true;
-            } else if (isBlank(mailUsername) || isBlank(mailPassword)) {
-                log.warn("╔══════════════════════════════════════════════════════════════╗");
-                log.warn("║  EMAIL CREDENTIALS INCOMPLETE                               ║");
-                log.warn("║  MAIL_HOST is set but MAIL_USERNAME or MAIL_PASSWORD is     ║");
-                log.warn("║  empty. SMTP authentication may fail.                      ║");
-                log.warn("║  Set MAIL_USERNAME and MAIL_PASSWORD to fix.                ║");
-                log.warn("╚══════════════════════════════════════════════════════════════╝");
-                hasIssues = true;
             } else {
-                log.info("[CONFIG] Email: real SMTP enabled (host={})", mailHost);
+                log.info("[CONFIG] Email: Resend provider enabled");
+                if (from != null && from.contains("@")) {
+                    String senderEmail = from.replaceAll(".*<(.+)>.+", "$1").trim();
+                    if (senderEmail.endsWith("@resend.dev")) {
+                        log.warn("[CONFIG] Email sender uses Resend sandbox domain ({}). " +
+                                "Deliveries may land in spam. For production, verify a " +
+                                "custom domain at resend.com", senderEmail);
+                    }
+                }
             }
         } else {
             log.info("[CONFIG] Email: mock mode (EMAIL_ENABLED=false)");

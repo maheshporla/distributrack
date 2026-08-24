@@ -32,6 +32,7 @@ export const ROUTES = {
   DELIVERY_WORKER_DELIVERIES: "/delivery/deliveries",
   DELIVERY_WORKER_NOTIFICATIONS: "/delivery/notifications",
   DELIVERY_WORKER_SETTINGS: "/delivery/settings",
+  DELIVERY_WORKER_EARNINGS: "/delivery/earnings",
 
   // Admin / staff portal
   DASHBOARD: "/dashboard",

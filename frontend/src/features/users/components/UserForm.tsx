@@ -25,21 +25,20 @@ import { userService } from "@/services/api/userService";
 
 import type { UserProfile } from "@/types/auth.types";
 import type { RoleName } from "@/types/auth.types";
+import { useAuthStore } from "@/store/authStore";
 
 /**
- * Roles an administrator can assign from this module. SUPER_ADMIN is
- * deliberately excluded — a second SUPER_ADMIN can only ever be created
- * by another SUPER_ADMIN through the backend directly, and the UI does
- * not offer it (matches the product requirement: admins create
- * OWNER/MANAGER/SALESMAN/DELIVERY_BOY/SHOPKEEPER).
+ * Roles each actor role is permitted to assign.
+ * Matches the backend canManageRole() matrix exactly.
  */
-export const ASSIGNABLE_ROLES: RoleName[] = [
-  "OWNER",
-  "MANAGER",
-  "SALESMAN",
-  "DELIVERY_BOY",
-  "SHOPKEEPER",
-];
+const ROLE_ASSIGNMENT_MATRIX: Record<RoleName, RoleName[]> = {
+  SUPER_ADMIN: ["OWNER", "MANAGER", "SALESMAN", "DELIVERY_BOY", "SHOPKEEPER"],
+  OWNER:       ["MANAGER", "SALESMAN", "DELIVERY_BOY", "SHOPKEEPER"],
+  MANAGER:     ["MANAGER", "SALESMAN", "DELIVERY_BOY", "SHOPKEEPER"],
+  SALESMAN:    [],
+  DELIVERY_BOY: [],
+  SHOPKEEPER:  [],
+};
 
 /** "DELIVERY_BOY" -> "Delivery Boy" — display only, value sent to the backend is unchanged. */
 function formatRoleLabel(role: string): string {
@@ -61,6 +60,17 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
   const isEdit = Boolean(user);
   const isSuperAdminTarget = user?.role === "SUPER_ADMIN";
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Determine which roles the current user can assign
+  const actorRole = useAuthStore((state) => state.user?.role);
+  const assignableRoles: RoleName[] =
+    (actorRole && ROLE_ASSIGNMENT_MATRIX[actorRole]) ?? [];
+
+  // For edit mode, if the target user's current role isn't in the
+  // assignable list, include it so the dropdown isn't empty/broken.
+  const effectiveRoles = isEdit && user?.role && !assignableRoles.includes(user.role)
+    ? [...assignableRoles, user.role]
+    : assignableRoles;
 
   const createForm = useForm<CreateUserValues>({
     resolver: zodResolver(createUserSchema),
@@ -163,7 +173,7 @@ export function UserForm({ user, onSuccess, onCancel }: UserFormProps) {
           <SelectValue placeholder="Select a role" />
         </SelectTrigger>
         <SelectContent>
-          {ASSIGNABLE_ROLES.map((role) => (
+          {effectiveRoles.map((role) => (
             <SelectItem key={role} value={role}>
               {formatRoleLabel(role)}
             </SelectItem>

@@ -44,18 +44,22 @@ public class UserServiceImpl implements UserService {
     // ------------------------------------------------------------------
     // Role matrix — who may create/manage which roles.
     //   SUPER_ADMIN: OWNER, MANAGER, SALESMAN, DELIVERY_BOY, SHOPKEEPER
-    //   OWNER:       OWNER, MANAGER, SALESMAN, DELIVERY_BOY, SHOPKEEPER
+    //   OWNER:       MANAGER, SALESMAN, DELIVERY_BOY, SHOPKEEPER
     //   MANAGER:     MANAGER, SALESMAN, DELIVERY_BOY, SHOPKEEPER
     //   SALESMAN/DELIVERY_BOY/SHOPKEEPER: none
     //
     // Nobody — not even a SUPER_ADMIN — can create or assign the
     // SUPER_ADMIN role through user management. The first-admin setup
     // is the ONLY way a SUPER_ADMIN account can come into existence.
+    //
+    // OWNER accounts can only be created by SUPER_ADMIN. This prevents
+    // a distributor from creating competing distributor accounts.
     // ------------------------------------------------------------------
     private boolean canManageRole(RoleName actorRole, RoleName targetRole) {
         return switch (actorRole) {
             case SUPER_ADMIN -> targetRole != RoleName.SUPER_ADMIN;
-            case OWNER -> targetRole != RoleName.SUPER_ADMIN;
+            case OWNER -> targetRole != RoleName.SUPER_ADMIN
+                    && targetRole != RoleName.OWNER;
             case MANAGER -> targetRole == RoleName.MANAGER
                     || targetRole == RoleName.SALESMAN
                     || targetRole == RoleName.DELIVERY_BOY
