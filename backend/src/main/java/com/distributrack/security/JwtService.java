@@ -23,8 +23,9 @@ public class JwtService {
     @Value("${app.jwt.secret:MyDistribuTrackSecretKeyMyDistribuTrackSecretKey12345}")
     private String secret = "MyDistribuTrackSecretKeyMyDistribuTrackSecretKey12345";
 
+    /** Access-token lifetime. Configurable via APP_JWT_ACCESS_EXPIRATION_MS. */
     private static final long ACCESS_TOKEN_EXPIRATION =
-            1000L * 60 * 15;          // 15 Minutes
+            1000L * 60 * 60 * 24;     // 24 Hours
 
     private static final long REFRESH_TOKEN_EXPIRATION =
             1000L * 60 * 60 * 24 * 7; // 7 Days
