@@ -4,7 +4,9 @@ import com.distributrack.entity.Inventory;
 import com.distributrack.entity.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import jakarta.persistence.LockModeType;
@@ -36,6 +38,7 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
      * deduction to avoid overselling in race conditions.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM Inventory i WHERE i.id = :id")
     @QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000")})
-    Optional<Inventory> findByIdWithLock(Long id);
+    Optional<Inventory> findByIdWithLock(@Param("id") Long id);
 }
