@@ -3,13 +3,19 @@ import { Package2, BarChart3, Boxes, Truck, ShieldCheck } from "lucide-react";
 import { APP_NAME } from "@/constants/app.constants";
 
 /**
- * Premium auth layout with dark brand panel and centered form area.
+ * Premium auth layout with stable two-column layout.
+ *
+ * Desktop: left branding panel is fixed at viewport height;
+ * right form panel centers its content independently.
+ * Switching registration roles does NOT shift the left panel.
+ *
+ * Mobile: branding + form stacked vertically.
  */
 export function AuthLayout() {
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Brand panel — hidden on small screens */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-sidebar via-sidebar to-[hsl(222,47%,10%)] p-10 lg:flex">
+      {/* Brand panel — hidden on small screens, fixed height on desktop */}
+      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-sidebar via-sidebar to-[hsl(222,47%,10%)] p-10 lg:flex lg:h-screen lg:shrink-0">
         {/* Subtle pattern overlay */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_70%,hsl(174,60%,42%,0.08),transparent_60%)]" />
 
@@ -68,8 +74,8 @@ export function AuthLayout() {
         </p>
       </div>
 
-      {/* Form panel */}
-      <div className="flex w-full flex-1 items-center justify-center p-6 lg:w-1/2">
+      {/* Form panel — centers content independently on desktop */}
+      <div className="flex w-full flex-1 flex-col items-center justify-center p-6 lg:h-screen lg:overflow-y-auto">
         <div className="w-full max-w-sm">
           {/* Mobile brand — shown only on small screens */}
           <div className="mb-8 flex items-center gap-3 lg:hidden">

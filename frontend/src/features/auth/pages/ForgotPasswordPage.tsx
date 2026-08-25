@@ -29,7 +29,7 @@ const COOLDOWN_SECONDS = 60;
  * /forgot-password
  *
  * Three-step password reset flow:
- * 1. Enter email → OTP sent to registered email via Gmail SMTP
+ * 1. Enter email → OTP sent to registered email via Resend
  * 2. Enter 6-digit OTP → verified server-side → reset token issued
  * 3. Set new password → password reset complete → redirect to login
  */
